@@ -71,3 +71,10 @@ Run the SQL in `migrations/001_init.sql` in your Supabase SQL editor.
 ## Notes
 - Ensure Redis is reachable for BullMQ.
 - Stripe webhook endpoint: `/api/payments/webhook`.
+
+## Investment Wallet Feature Checklist
+- Multi-exchange portfolio aggregation (CCXT supported).
+- Live pricing + PnL with CoinGecko pricing.
+- Manual holdings for cold wallets and off-exchange assets.
+- Encrypted API key storage at rest.
+- Rate-limited API to prevent abuse.
