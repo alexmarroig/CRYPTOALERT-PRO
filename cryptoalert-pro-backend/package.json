@@ -1,0 +1,46 @@
+{
+  "name": "cryptoalert-pro-backend",
+  "version": "1.0.0",
+  "description": "CryptoAlert Pro backend infrastructure",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "eslint . --ext .ts",
+    "test": "node --loader ts-node/esm --test"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "bullmq": "^5.0.0",
+    "ccxt": "^4.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.0",
+    "express-rate-limit": "^7.0.0",
+    "firebase-admin": "^12.0.0",
+    "ioredis": "^5.3.0",
+    "jsonwebtoken": "^9.0.0",
+    "node-fetch": "^3.3.2",
+    "stripe": "^14.0.0",
+    "winston": "^3.11.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.11.5",
+    "@types/node-fetch": "^3.0.3",
+    "@types/supertest": "^2.0.16",
+    "@types/stripe": "^8.0.416",
+    "eslint": "^8.56.0",
+    "supertest": "^6.3.4",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.3"
+  },
+  "type": "module"
+}
