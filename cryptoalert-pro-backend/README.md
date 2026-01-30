@@ -68,6 +68,20 @@ Run the SQL in `migrations/001_init.sql` in your Supabase SQL editor.
 - `/api/payments/*`
 - `/api/influencer/*`
 
+## Subscription Rules
+- **FREE**
+  - Limited to **3 new signals per 7 days** for influencer publishing (counted in `signals`).
+  - Limited to **3 copied signals per 7 days** for users (counted in `user_trades`).
+  - Portfolio exchange sync is blocked; manual portfolio remains available.
+  - Billing portal is unavailable.
+- **PRO**
+  - Unlimited signal publishing/copying.
+  - Portfolio exchange sync available.
+  - Billing portal available.
+- **VIP**
+  - Same limits as PRO (no weekly caps).
+  - Billing portal available.
+
 ## Notes
 - Ensure Redis is reachable for BullMQ.
 - Stripe webhook endpoint: `/api/payments/webhook`.

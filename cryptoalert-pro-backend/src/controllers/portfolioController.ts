@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../config/supabase.js';
 import { PortfolioService } from '../services/portfolio.js';
 import { getLivePrices } from '../utils/coingecko.js';
+import { getSubscriptionTier } from '../utils/subscription.js';
 
 const syncSchema = z.object({
   exchange: z.string().min(1),
@@ -23,6 +24,11 @@ export async function syncPortfolio(req: Request, res: Response) {
   const parse = syncSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({ error: parse.error.flatten() });
+  }
+
+  const tier = await getSubscriptionTier(req.user?.id);
+  if (tier === 'free') {
+    return res.status(403).json({ error: 'Upgrade required to sync exchange portfolios.' });
   }
 
   const portfolio = await portfolioService.syncExchange(
