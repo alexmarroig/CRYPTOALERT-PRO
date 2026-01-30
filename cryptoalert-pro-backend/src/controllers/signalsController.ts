@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabase } from '../config/supabase.js';
 import { signalQueue } from '../utils/queue.js';
+import { getSubscriptionTier } from '../utils/subscription.js';
 
 const createSignalSchema = z.object({
   coin: z.string().min(1),
@@ -23,6 +24,26 @@ export async function createSignal(req: Request, res: Response) {
   const parse = createSignalSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({ error: parse.error.flatten() });
+  }
+
+  const tier = await getSubscriptionTier(req.user?.id);
+  if (tier === 'free') {
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - 7);
+
+    const { count, error: limitError } = await supabase
+      .from('signals')
+      .select('id', { count: 'exact', head: true })
+      .eq('influencer_id', req.user?.id)
+      .gte('created_at', weekStart.toISOString());
+
+    if (limitError) {
+      return res.status(500).json({ error: limitError.message });
+    }
+
+    if ((count ?? 0) >= 3) {
+      return res.status(403).json({ error: 'Free tier limited to 3 signals per 7 days.' });
+    }
   }
 
   const { error, data } = await supabase
@@ -93,6 +114,26 @@ export async function copySignal(req: Request, res: Response) {
   const parse = copySignalSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({ error: parse.error.flatten() });
+  }
+
+  const tier = await getSubscriptionTier(req.user?.id);
+  if (tier === 'free') {
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - 7);
+
+    const { count, error: limitError } = await supabase
+      .from('user_trades')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', req.user?.id)
+      .gte('created_at', weekStart.toISOString());
+
+    if (limitError) {
+      return res.status(500).json({ error: limitError.message });
+    }
+
+    if ((count ?? 0) >= 3) {
+      return res.status(403).json({ error: 'Free tier limited to 3 copied signals per 7 days.' });
+    }
   }
 
   const { id } = req.params;
