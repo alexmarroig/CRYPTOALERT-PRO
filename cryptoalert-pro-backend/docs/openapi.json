@@ -1,0 +1,327 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "CryptoAlert Pro API",
+    "version": "1.0.0",
+    "description": "API REST para CryptoAlert Pro (alertas, posts, portfolio read-only, billing e notificações)."
+  },
+  "servers": [
+    {
+      "url": "/v1"
+    }
+  ],
+  "paths": {
+    "/me": {
+      "get": {
+        "summary": "Retorna o perfil do usuário logado",
+        "responses": {
+          "200": {
+            "description": "Perfil retornado"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Atualiza dados do perfil",
+        "responses": {
+          "200": {
+            "description": "Perfil atualizado"
+          }
+        }
+      }
+    },
+    "/auth/accept-invite": {
+      "post": {
+        "summary": "Aceita convite de influencer",
+        "responses": {
+          "200": {
+            "description": "Convite aceito"
+          }
+        }
+      }
+    },
+    "/admin/invites": {
+      "get": {
+        "summary": "Lista convites de influencer",
+        "responses": {
+          "200": {
+            "description": "Lista de convites"
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria convite de influencer",
+        "responses": {
+          "201": {
+            "description": "Convite criado"
+          }
+        }
+      }
+    },
+    "/admin/invites/{id}/revoke": {
+      "post": {
+        "summary": "Revoga convite",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Convite revogado"
+          }
+        }
+      }
+    },
+    "/admin/influencers": {
+      "get": {
+        "summary": "Lista influencers",
+        "responses": {
+          "200": {
+            "description": "Lista de influencers"
+          }
+        }
+      }
+    },
+    "/follow": {
+      "post": {
+        "summary": "Segue um perfil",
+        "responses": {
+          "201": {
+            "description": "Follow criado"
+          }
+        }
+      }
+    },
+    "/follow/{followingId}": {
+      "delete": {
+        "summary": "Remove follow",
+        "parameters": [
+          {
+            "name": "followingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Follow removido"
+          }
+        }
+      }
+    },
+    "/following": {
+      "get": {
+        "summary": "Lista perfis seguidos",
+        "responses": {
+          "200": {
+            "description": "Lista de follows"
+          }
+        }
+      }
+    },
+    "/followers": {
+      "get": {
+        "summary": "Lista seguidores",
+        "responses": {
+          "200": {
+            "description": "Lista de seguidores"
+          }
+        }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "summary": "Lista alertas",
+        "responses": {
+          "200": {
+            "description": "Lista de alertas"
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria alerta",
+        "responses": {
+          "201": {
+            "description": "Alerta criado"
+          }
+        }
+      }
+    },
+    "/alerts/{id}/status": {
+      "patch": {
+        "summary": "Atualiza status do alerta",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status atualizado"
+          }
+        }
+      }
+    },
+    "/posts": {
+      "get": {
+        "summary": "Lista posts",
+        "responses": {
+          "200": {
+            "description": "Lista de posts"
+          }
+        }
+      },
+      "post": {
+        "summary": "Cria post",
+        "responses": {
+          "201": {
+            "description": "Post criado"
+          }
+        }
+      }
+    },
+    "/portfolio/connect": {
+      "post": {
+        "summary": "Conecta exchange ao portfolio",
+        "responses": {
+          "201": {
+            "description": "Conexão salva"
+          }
+        }
+      }
+    },
+    "/portfolio/test-connection": {
+      "post": {
+        "summary": "Testa conexão com exchange",
+        "responses": {
+          "200": {
+            "description": "Conexão válida"
+          }
+        }
+      }
+    },
+    "/portfolio/sync": {
+      "post": {
+        "summary": "Sincroniza snapshot do portfolio",
+        "responses": {
+          "200": {
+            "description": "Snapshot atualizado"
+          }
+        }
+      }
+    },
+    "/portfolio/me": {
+      "get": {
+        "summary": "Retorna snapshot do usuário",
+        "responses": {
+          "200": {
+            "description": "Snapshot retornado"
+          }
+        }
+      }
+    },
+    "/portfolio/visibility": {
+      "patch": {
+        "summary": "Atualiza visibilidade do portfolio",
+        "responses": {
+          "200": {
+            "description": "Visibilidade atualizada"
+          }
+        }
+      }
+    },
+    "/portfolio/public/{username}": {
+      "get": {
+        "summary": "Retorna portfolio público",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portfolio público"
+          }
+        }
+      }
+    },
+    "/influencer/metrics/me": {
+      "get": {
+        "summary": "Métricas do influencer",
+        "responses": {
+          "200": {
+            "description": "Métricas retornadas"
+          }
+        }
+      }
+    },
+    "/notify/test": {
+      "post": {
+        "summary": "Dispara notificação de teste",
+        "responses": {
+          "200": {
+            "description": "Notificação enviada"
+          }
+        }
+      }
+    },
+    "/push/register": {
+      "post": {
+        "summary": "Registra token de push",
+        "responses": {
+          "201": {
+            "description": "Token registrado"
+          }
+        }
+      }
+    },
+    "/billing/checkout": {
+      "post": {
+        "summary": "Cria sessão de checkout Stripe",
+        "responses": {
+          "200": {
+            "description": "Checkout criado"
+          }
+        }
+      }
+    },
+    "/billing/status": {
+      "get": {
+        "summary": "Retorna status de billing",
+        "responses": {
+          "200": {
+            "description": "Status retornado"
+          }
+        }
+      }
+    },
+    "/billing/webhook": {
+      "post": {
+        "summary": "Webhook Stripe",
+        "responses": {
+          "200": {
+            "description": "Webhook processado"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,48 +1,34 @@
 import type { Request, Response } from 'express';
-import { supabase } from '../config/supabase.js';
-import { EarningsService } from '../services/earnings.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
-const earningsService = new EarningsService();
-
-export async function getEarnings(req: Request, res: Response) {
-  const totals = await earningsService.calculateInfluencerEarnings(req.user?.id ?? '');
-  return res.json(totals);
-}
-
-export async function requestPayout(req: Request, res: Response) {
-  const { error } = await supabase
-    .from('influencer_earnings')
-    .update({ payout_status: 'requested' })
-    .eq('influencer_id', req.user?.id)
-    .eq('payout_status', 'pending');
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
+export async function getInfluencerMetrics(req: Request, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  return res.json({ status: 'requested' });
-}
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
 
-export async function getStats(req: Request, res: Response) {
-  const influencerId = req.user?.id;
-
-  const { data: signals } = await supabase
-    .from('signals')
-    .select('id, status, win_rate')
-    .eq('influencer_id', influencerId);
-
-  const { data: referred } = await supabase
-    .from('users')
-    .select('id')
-    .eq('referred_by', influencerId);
-
-  const totalSignals = signals?.length ?? 0;
-  const winRate = signals?.reduce((sum, signal) => sum + Number(signal.win_rate ?? 0), 0) / (totalSignals || 1);
+  const [{ count: followers }, { count: alerts }, { count: posts }] = await Promise.all([
+    supabaseAdmin
+      .from('follows')
+      .select('follower_id', { count: 'exact', head: true })
+      .eq('following_id', req.user.id),
+    supabaseAdmin
+      .from('alerts')
+      .select('id', { count: 'exact', head: true })
+      .eq('creator_id', req.user.id)
+      .gte('created_at', since.toISOString()),
+    supabaseAdmin
+      .from('posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('creator_id', req.user.id)
+      .gte('created_at', since.toISOString())
+  ]);
 
   return res.json({
-    totalSignals,
-    totalUsers: referred?.length ?? 0,
-    conversionRate: (referred?.length ?? 0) / (totalSignals || 1),
-    averageWinRate: Number.isFinite(winRate) ? winRate : 0
+    followers_count: followers ?? 0,
+    alerts_count_30d: alerts ?? 0,
+    posts_count_30d: posts ?? 0
   });
 }
