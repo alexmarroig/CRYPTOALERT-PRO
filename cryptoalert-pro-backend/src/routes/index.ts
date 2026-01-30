@@ -5,6 +5,7 @@ import { portfolioRoutes } from './portfolioRoutes.js';
 import { paymentsRoutes } from './paymentsRoutes.js';
 import { influencerRoutes } from './influencerRoutes.js';
 import { guestRoutes } from './guestRoutes.js';
+import { feedRoutes } from './feedRoutes.js';
 
 export const apiRoutes = Router();
 
@@ -14,3 +15,4 @@ apiRoutes.use('/portfolio', portfolioRoutes);
 apiRoutes.use('/payments', paymentsRoutes);
 apiRoutes.use('/influencer', influencerRoutes);
 apiRoutes.use('/guest', guestRoutes);
+apiRoutes.use('/feed', feedRoutes);
