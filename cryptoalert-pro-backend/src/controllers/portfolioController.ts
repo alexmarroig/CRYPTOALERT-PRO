@@ -1,156 +1,160 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
-import { supabase } from '../config/supabase.js';
-import { PortfolioService } from '../services/portfolio.js';
-import { getLivePrices } from '../utils/coingecko.js';
-import { getSubscriptionTier } from '../utils/subscription.js';
+import { supabaseAdmin } from '../config/supabase.js';
+import { connectExchange, syncPortfolioSnapshot, testExchangeConnection } from '../services/portfolioSync.js';
 
-const syncSchema = z.object({
-  exchange: z.string().min(1),
-  api_key: z.string().min(1),
-  api_secret: z.string().min(1)
+const connectSchema = z.object({
+  exchange: z.enum(['binance', 'okx']),
+  apiKey: z.string().min(1),
+  apiSecret: z.string().min(1)
 });
 
-const manualSchema = z.array(
-  z.object({
-    symbol: z.string().min(1),
-    amount: z.number().positive()
-  })
-);
+const visibilitySchema = z.object({
+  visibility: z.enum(['private', 'friends', 'public', 'percent'])
+});
 
-const portfolioService = new PortfolioService();
-
-export async function syncPortfolio(req: Request, res: Response) {
-  const parse = syncSchema.safeParse(req.body);
-  if (!parse.success) {
-    return res.status(400).json({ error: parse.error.flatten() });
-  }
-
-  const tier = await getSubscriptionTier(req.user?.id);
-  if (tier === 'free') {
-    return res.status(403).json({ error: 'Upgrade required to sync exchange portfolios.' });
-  }
-
-  const portfolio = await portfolioService.syncExchange(
-    req.user?.id ?? '',
-    parse.data.exchange,
-    parse.data.api_key,
-    parse.data.api_secret
-  );
-
-  return res.json({ portfolio });
-}
-
-export async function getPortfolio(req: Request, res: Response) {
-  const { data, error } = await supabase
-    .from('users')
-    .select('portfolio_manual')
-    .eq('id', req.user?.id)
-    .single();
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-
-  const manual = (data?.portfolio_manual ?? []) as Array<{ symbol: string; amount: number }>;
-  const prices = await getLivePrices(manual.map((item) => item.symbol));
-  const holdings = manual.map((item) => ({
-    ...item,
-    usd_value: (prices[item.symbol.toLowerCase()]?.usd ?? 0) * item.amount
-  }));
-
-  return res.json({ manual: holdings });
-}
-
-export async function updateManualPortfolio(req: Request, res: Response) {
-  const parse = manualSchema.safeParse(req.body);
-  if (!parse.success) {
-    return res.status(400).json({ error: parse.error.flatten() });
-  }
-
-  const { error } = await supabase
-    .from('users')
-    .update({ portfolio_manual: parse.data })
-    .eq('id', req.user?.id);
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-
-  return res.json({ portfolio_manual: parse.data });
-}
-
-export async function getPortfolioPnLComparison(req: Request, res: Response) {
-  const userId = req.user?.id;
-  if (!userId) {
+export async function connectPortfolio(req: Request, res: Response) {
+  if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('referred_by')
-    .eq('id', userId)
+  const parse = connectSchema.safeParse(req.body);
+  if (!parse.success) {
+    return res.status(400).json({ error: parse.error.flatten() });
+  }
+
+  await connectExchange(req.user.id, parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
+  return res.status(201).json({ connected: true });
+}
+
+export async function testPortfolioConnection(req: Request, res: Response) {
+  const parse = connectSchema.safeParse(req.body);
+  if (!parse.success) {
+    return res.status(400).json({ error: parse.error.flatten() });
+  }
+
+  await testExchangeConnection(parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
+  return res.json({ ok: true });
+}
+
+export async function syncPortfolio(req: Request, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const snapshot = await syncPortfolioSnapshot(req.user.id);
+  return res.json({ snapshot });
+}
+
+export async function getMyPortfolio(req: Request, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('portfolios_snapshot')
+    .select('*')
+    .eq('user_id', req.user.id)
     .single();
 
-  if (userError) {
-    return res.status(500).json({ error: userError.message });
+  if (error) {
+    return res.status(500).json({ error: error.message });
   }
 
-  const influencerId = (req.query.influencer_id as string | undefined) ?? user?.referred_by ?? null;
-  if (!influencerId) {
-    return res.status(400).json({ error: 'Influencer ID not provided' });
+  return res.json({ snapshot: data });
+}
+
+export async function updatePortfolioVisibility(req: Request, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { data: userTrades, error: userTradesError } = await supabase
-    .from('user_trades')
-    .select('pnl_usd, pnl_pct')
-    .eq('user_id', userId);
-
-  if (userTradesError) {
-    return res.status(500).json({ error: userTradesError.message });
+  const parse = visibilitySchema.safeParse(req.body);
+  if (!parse.success) {
+    return res.status(400).json({ error: parse.error.flatten() });
   }
 
-  const userTotals = (userTrades ?? []).reduce(
-    (acc, trade) => {
-      acc.totalUsd += Number(trade.pnl_usd ?? 0);
-      acc.totalPct += Number(trade.pnl_pct ?? 0);
-      acc.count += 1;
-      return acc;
-    },
-    { totalUsd: 0, totalPct: 0, count: 0 }
-  );
+  const { data, error } = await supabaseAdmin
+    .from('portfolio_visibility')
+    .upsert({
+      user_id: req.user.id,
+      visibility: parse.data.visibility
+    })
+    .select()
+    .single();
 
-  const { data: influencerTrades, error: influencerTradesError } = await supabase
-    .from('user_trades')
-    .select('pnl_usd, pnl_pct, signals!inner(influencer_id)')
-    .eq('signals.influencer_id', influencerId);
-
-  if (influencerTradesError) {
-    return res.status(500).json({ error: influencerTradesError.message });
+  if (error) {
+    return res.status(500).json({ error: error.message });
   }
 
-  const influencerTotals = (influencerTrades ?? []).reduce(
-    (acc, trade) => {
-      acc.totalUsd += Number(trade.pnl_usd ?? 0);
-      acc.totalPct += Number(trade.pnl_pct ?? 0);
-      acc.count += 1;
-      return acc;
-    },
-    { totalUsd: 0, totalPct: 0, count: 0 }
-  );
+  return res.json({ visibility: data });
+}
 
-  return res.json({
-    user: {
-      user_id: userId,
-      total_pnl_usd: userTotals.totalUsd,
-      average_pnl_pct: userTotals.count ? userTotals.totalPct / userTotals.count : 0,
-      trades_count: userTotals.count
-    },
-    influencer: {
-      influencer_id: influencerId,
-      total_pnl_usd: influencerTotals.totalUsd,
-      average_pnl_pct: influencerTotals.count ? influencerTotals.totalPct / influencerTotals.count : 0,
-      trades_count: influencerTotals.count
+export async function getPublicPortfolio(req: Request, res: Response) {
+  const { username } = req.params;
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, username')
+    .eq('username', username)
+    .single();
+
+  if (profileError || !profile) {
+    return res.status(404).json({ error: 'Profile not found' });
+  }
+
+  const { data: visibility } = await supabaseAdmin
+    .from('portfolio_visibility')
+    .select('visibility')
+    .eq('user_id', profile.id)
+    .single();
+
+  const mode = visibility?.visibility ?? 'private';
+  if (mode === 'private') {
+    return res.status(403).json({ error: 'Portfolio is private' });
+  }
+
+  if (mode === 'friends') {
+    if (!req.user) {
+      return res.status(403).json({ error: 'Friends-only portfolio' });
     }
-  });
+
+    const { data: following } = await supabaseAdmin
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', req.user.id)
+      .eq('following_id', profile.id)
+      .maybeSingle();
+
+    const { data: reciprocal } = await supabaseAdmin
+      .from('follows')
+      .select('following_id')
+      .eq('follower_id', profile.id)
+      .eq('following_id', req.user.id)
+      .maybeSingle();
+
+    if (!following || !reciprocal) {
+      return res.status(403).json({ error: 'Friends-only portfolio' });
+    }
+  }
+
+  const { data: snapshot } = await supabaseAdmin
+    .from('portfolios_snapshot')
+    .select('total_value, change_pct_30d, assets, updated_at')
+    .eq('user_id', profile.id)
+    .single();
+
+  if (mode === 'percent') {
+    const topAssets = (snapshot?.assets ?? []).map((asset: { symbol: string; pct: number }) => ({
+      symbol: asset.symbol,
+      pct: asset.pct
+    }));
+    return res.json({
+      username: profile.username,
+      change_pct_30d: snapshot?.change_pct_30d ?? 0,
+      top_assets_percent: topAssets
+    });
+  }
+
+  return res.json({ username: profile.username, snapshot });
 }
