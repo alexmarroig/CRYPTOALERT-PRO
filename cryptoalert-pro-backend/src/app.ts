@@ -22,6 +22,7 @@ export function createApp() {
   });
 
   app.use(apiRateLimit);
+  app.use(auditLogger);
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });

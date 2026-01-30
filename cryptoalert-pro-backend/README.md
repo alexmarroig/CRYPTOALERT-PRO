@@ -100,6 +100,9 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 - `GET /v1/billing/status`
 - `POST /v1/billing/webhook`
 
+## OpenAPI
+- `docs/openapi.json`
+
 ## Deploy
 Compatível com Railway/Render/Vercel Serverless. Garanta:
 - Secrets e ENV configurados
