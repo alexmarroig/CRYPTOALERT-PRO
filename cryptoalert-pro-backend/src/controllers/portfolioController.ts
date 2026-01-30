@@ -73,3 +73,78 @@ export async function updateManualPortfolio(req: Request, res: Response) {
 
   return res.json({ portfolio_manual: parse.data });
 }
+
+export async function getPortfolioPnLComparison(req: Request, res: Response) {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { data: user, error: userError } = await supabase
+    .from('users')
+    .select('referred_by')
+    .eq('id', userId)
+    .single();
+
+  if (userError) {
+    return res.status(500).json({ error: userError.message });
+  }
+
+  const influencerId = (req.query.influencer_id as string | undefined) ?? user?.referred_by ?? null;
+  if (!influencerId) {
+    return res.status(400).json({ error: 'Influencer ID not provided' });
+  }
+
+  const { data: userTrades, error: userTradesError } = await supabase
+    .from('user_trades')
+    .select('pnl_usd, pnl_pct')
+    .eq('user_id', userId);
+
+  if (userTradesError) {
+    return res.status(500).json({ error: userTradesError.message });
+  }
+
+  const userTotals = (userTrades ?? []).reduce(
+    (acc, trade) => {
+      acc.totalUsd += Number(trade.pnl_usd ?? 0);
+      acc.totalPct += Number(trade.pnl_pct ?? 0);
+      acc.count += 1;
+      return acc;
+    },
+    { totalUsd: 0, totalPct: 0, count: 0 }
+  );
+
+  const { data: influencerTrades, error: influencerTradesError } = await supabase
+    .from('user_trades')
+    .select('pnl_usd, pnl_pct, signals!inner(influencer_id)')
+    .eq('signals.influencer_id', influencerId);
+
+  if (influencerTradesError) {
+    return res.status(500).json({ error: influencerTradesError.message });
+  }
+
+  const influencerTotals = (influencerTrades ?? []).reduce(
+    (acc, trade) => {
+      acc.totalUsd += Number(trade.pnl_usd ?? 0);
+      acc.totalPct += Number(trade.pnl_pct ?? 0);
+      acc.count += 1;
+      return acc;
+    },
+    { totalUsd: 0, totalPct: 0, count: 0 }
+  );
+
+  return res.json({
+    user: {
+      user_id: userId,
+      total_pnl_usd: userTotals.totalUsd,
+      average_pnl_pct: userTotals.count ? userTotals.totalPct / userTotals.count : 0,
+      trades_count: userTotals.count
+    },
+    influencer: {
+      influencer_id: influencerId,
+      total_pnl_usd: influencerTotals.totalUsd,
+      average_pnl_pct: influencerTotals.count ? influencerTotals.totalPct / influencerTotals.count : 0,
+      trades_count: influencerTotals.count
+    }
+  });
+}
