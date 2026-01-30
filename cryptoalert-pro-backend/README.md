@@ -1,94 +1,112 @@
 # CryptoAlert Pro Backend
 
-Production-ready backend for CryptoAlert Pro, built with Node.js 20, Express, Supabase, Stripe, BullMQ, Firebase, and CCXT.
+Backend production-ready para o app **CryptoAlert Pro**, focado em **alertas e recomendações**, sem execução de trades. O portfolio é **read-only** via API keys. O frontend é responsável por abrir deep links para exchanges.
 
-## Features
-- Supabase Auth + Postgres
-- REST API for auth, signals, portfolio, payments, influencer
-- Stripe subscriptions + webhook handling
-- BullMQ signal distribution
-- Firebase push notifications
-- CoinGecko live pricing
-- CCXT portfolio sync
-- Winston logging + rate limiting
+## Stack
+- Node.js 20+, TypeScript, Express
+- Supabase Postgres com RLS + Supabase Auth
+- Stripe (checkout + webhook)
+- Firebase Cloud Messaging (push)
+- CCXT (apenas leitura de balances)
+- AES-256-GCM para criptografar API secrets
 
-## Project Structure
+## Features (MVP)
+- Autenticação via Supabase Auth
+- Roles: `user`, `influencer`, `admin`
+- Admin definido por whitelist de emails (`admin_whitelist`)
+- Convite para influencer via token
+- Alerts & Posts com notificação para seguidores
+- Follow social (user/influencer)
+- Portfolio read-only (Binance/OKX) com snapshots
+- Visibilidade de portfolio: `private`, `friends`, `public`, `percent`
+- Stripe billing com planos `free`, `pro`, `vip`
+- Rate limiting, validação com Zod e logs básicos
+
+## Estrutura
 ```
-cryptoalert-pro-backend/
-├── src/
-│ ├── controllers/
-│ ├── services/
-│ ├── models/
-│ ├── middleware/
-│ ├── utils/
-│ ├── routes/
-│ └── config/
-├── migrations/
-├── package.json
-├── vercel.json
-└── README.md
+src/
+  app.ts
+  config/
+  controllers/
+  middleware/
+  routes/
+  services/
+  utils/
+supabase/
+  migrations/
 ```
 
-## Environment Variables
-Create a `.env` file with:
+## Variáveis de ambiente
+Crie `.env` baseado em `.env.example`.
 ```
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_key
-STRIPE_SECRET_KEY=sk_test_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-STRIPE_PRICE_PRO=price_xxx
-STRIPE_PRICE_VIP=price_xxx
-FIREBASE_PROJECT_ID=your_project
-FIREBASE_SERVICE_ACCOUNT={"type":"service_account",...}
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=your_jwt_secret
+SUPABASE_URL=...
+SUPABASE_ANON_KEY=...
+SUPABASE_SERVICE_ROLE_KEY=...
+STRIPE_SECRET=...
+STRIPE_WEBHOOK_SECRET=...
+STRIPE_PRICE_PRO=...
+STRIPE_PRICE_VIP=...
+FIREBASE_PROJECT_ID=...
+FCM_SERVICE_ACCOUNT_JSON=...
 ENCRYPTION_KEY=64_hex_chars
-COINGECKO_API_KEY=optional
-FRONTEND_URL=https://cryptoalert.pro
-PORT=3000
 ```
 
-## Local Development
-```
-npm install
-npm run dev
-```
+## Migrations (Supabase)
+Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 
-## Migrations
-Run the SQL in `migrations/001_init.sql` in your Supabase SQL editor.
+## Rotas REST (/v1)
 
-## Deployment
-- Vercel configuration in `vercel.json`.
-- Set Vercel secrets to match the environment variables.
+### Auth/Profile
+- `GET /v1/me`
+- `PATCH /v1/me`
+- `POST /v1/auth/accept-invite`
 
-## API Routes
-- `/api/auth/*`
-- `/api/signals/*`
-- `/api/portfolio/*`
-- `/api/payments/*`
-- `/api/influencer/*`
+### Admin
+- `POST /v1/admin/invites`
+- `GET /v1/admin/invites`
+- `POST /v1/admin/invites/:id/revoke`
+- `GET /v1/admin/influencers`
 
-## Subscription Rules
-- **FREE**
-  - Limited to **3 new signals per 7 days** for influencer publishing (counted in `signals`).
-  - Limited to **3 copied signals per 7 days** for users (counted in `user_trades`).
-  - Portfolio exchange sync is blocked; manual portfolio remains available.
-  - Billing portal is unavailable.
-- **PRO**
-  - Unlimited signal publishing/copying.
-  - Portfolio exchange sync available.
-  - Billing portal available.
-- **VIP**
-  - Same limits as PRO (no weekly caps).
-  - Billing portal available.
+### Follow / Social
+- `POST /v1/follow`
+- `DELETE /v1/follow/:followingId`
+- `GET /v1/following`
+- `GET /v1/followers`
 
-## Notes
-- Ensure Redis is reachable for BullMQ.
-- Stripe webhook endpoint: `/api/payments/webhook`.
+### Alerts / Posts
+- `GET /v1/alerts`
+- `POST /v1/alerts`
+- `PATCH /v1/alerts/:id/status`
+- `GET /v1/posts`
+- `POST /v1/posts`
 
-## Investment Wallet Feature Checklist
-- Multi-exchange portfolio aggregation (CCXT supported).
-- Live pricing + PnL with CoinGecko pricing.
-- Manual holdings for cold wallets and off-exchange assets.
-- Encrypted API key storage at rest.
-- Rate-limited API to prevent abuse.
+### Portfolio
+- `POST /v1/portfolio/connect`
+- `POST /v1/portfolio/test-connection`
+- `POST /v1/portfolio/sync`
+- `GET /v1/portfolio/me`
+- `PATCH /v1/portfolio/visibility`
+- `GET /v1/portfolio/public/:username`
+
+### Influencer
+- `GET /v1/influencer/metrics/me`
+
+### Notifications
+- `POST /v1/notify/test`
+- `POST /v1/push/register`
+
+### Billing (Stripe)
+- `POST /v1/billing/checkout`
+- `GET /v1/billing/status`
+- `POST /v1/billing/webhook`
+
+## Deploy
+Compatível com Railway/Render/Vercel Serverless. Garanta:
+- Secrets e ENV configurados
+- Webhook Stripe apontando para `/v1/billing/webhook`
+- CORS restrito ao domínio do app (ex.: `FRONTEND_URL`)
+
+## Observações de segurança
+- **Nunca** retornamos `api_secret` em respostas.
+- `exchange_connections` guarda `api_secret_encrypted` com AES-256-GCM.
+- Nenhuma execução de trade é realizada neste backend.
