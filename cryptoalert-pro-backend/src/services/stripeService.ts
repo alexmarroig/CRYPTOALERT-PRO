@@ -1,4 +1,3 @@
-import type Stripe from 'stripe';
 import { stripe } from '../config/stripe.js';
 import { env } from '../config/env.js';
 import { supabaseAdmin } from '../config/supabase.js';
@@ -33,9 +32,18 @@ export async function createCheckoutSession(email: string, userId: string, plan:
   return session;
 }
 
-export async function handleStripeWebhook(event: Stripe.Event) {
+export async function handleStripeWebhook(event: {
+  type: string;
+  data: { object: Record<string, unknown> };
+}) {
   if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
-    const subscription = event.data.object as Stripe.Subscription;
+    const subscription = event.data.object as {
+      id: string;
+      customer: string;
+      current_period_end: number;
+      items: { data: Array<{ price: { id: string } }> };
+      metadata?: { user_id?: string };
+    };
     const priceId = subscription.items.data[0]?.price.id ?? '';
     const plan = priceId.includes('pro') ? 'pro' : 'vip';
 
@@ -65,7 +73,7 @@ export async function handleStripeWebhook(event: Stripe.Event) {
   }
 
   if (event.type === 'customer.subscription.deleted') {
-    const subscription = event.data.object as Stripe.Subscription;
+    const subscription = event.data.object as { customer: string };
 
     const { data: customer } = await supabaseAdmin
       .from('stripe_customers')
