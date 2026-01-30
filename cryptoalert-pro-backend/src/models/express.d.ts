@@ -1,9 +1,14 @@
-import type { User } from '@supabase/supabase-js';
-
 declare global {
   namespace Express {
     interface Request {
-      user?: User & { role?: string };
+      authToken?: string;
+      user?: {
+        id: string;
+        email: string;
+        role: 'user' | 'influencer' | 'admin';
+        plan: 'free' | 'pro' | 'vip';
+        username: string | null;
+      };
     }
   }
 }
