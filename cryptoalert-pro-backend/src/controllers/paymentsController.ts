@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { stripe } from '../config/stripe.js';
 import { env } from '../config/env.js';
 import { supabase } from '../config/supabase.js';
+import { getSubscriptionTier } from '../utils/subscription.js';
 
 const checkoutSchema = z.object({
   tier: z.enum(['pro', 'vip'])
@@ -12,6 +13,14 @@ export async function createCheckout(req: Request, res: Response) {
   const parse = checkoutSchema.safeParse(req.body);
   if (!parse.success) {
     return res.status(400).json({ error: parse.error.flatten() });
+  }
+
+  const currentTier = await getSubscriptionTier(req.user?.id);
+  if (currentTier === 'vip') {
+    return res.status(400).json({ error: 'Already on VIP tier.' });
+  }
+  if (currentTier === 'pro' && parse.data.tier === 'pro') {
+    return res.status(400).json({ error: 'Already on Pro tier.' });
   }
 
   const priceId = parse.data.tier === 'pro' ? process.env.STRIPE_PRICE_PRO : process.env.STRIPE_PRICE_VIP;
@@ -31,6 +40,11 @@ export async function createCheckout(req: Request, res: Response) {
 }
 
 export async function createPortal(req: Request, res: Response) {
+  const currentTier = await getSubscriptionTier(req.user?.id);
+  if (currentTier === 'free') {
+    return res.status(403).json({ error: 'Only paid subscribers can access the billing portal.' });
+  }
+
   const { data } = await supabase
     .from('users')
     .select('stripe_customer_id')
