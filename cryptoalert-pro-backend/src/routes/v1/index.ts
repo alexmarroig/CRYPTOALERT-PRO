@@ -9,6 +9,7 @@ import { portfolioRoutes } from './portfolioRoutes.js';
 import { influencerRoutes } from './influencerRoutes.js';
 import { notifyRoutes } from './notifyRoutes.js';
 import { billingRoutes } from './billingRoutes.js';
+import { rankingRoutes } from './rankingRoutes.js';
 
 export const v1Routes = Router();
 
@@ -22,3 +23,4 @@ v1Routes.use('/portfolio', portfolioRoutes);
 v1Routes.use('/influencer', influencerRoutes);
 v1Routes.use('/', notifyRoutes);
 v1Routes.use('/billing', billingRoutes);
+v1Routes.use('/', rankingRoutes);
