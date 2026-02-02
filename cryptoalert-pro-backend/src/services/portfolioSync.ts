@@ -70,5 +70,39 @@ export async function syncPortfolioSnapshot(userId: string) {
     throw upsertError;
   }
 
+  // Update streaks and points
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('points, streak_days, last_sync_at')
+    .eq('id', userId)
+    .single();
+
+  if (profile) {
+    let newPoints = (profile.points ?? 0) + 10; // +10 points for sync
+    let newStreak = profile.streak_days ?? 0;
+    const now = new Date();
+    const lastSync = profile.last_sync_at ? new Date(profile.last_sync_at) : null;
+
+    if (!lastSync) {
+      newStreak = 1;
+    } else {
+      const diffHours = (now.getTime() - lastSync.getTime()) / (1000 * 60 * 60);
+      if (diffHours > 24 && diffHours < 48) {
+        newStreak += 1;
+      } else if (diffHours >= 48) {
+        newStreak = 1;
+      }
+    }
+
+    await supabaseAdmin
+      .from('profiles')
+      .update({
+        points: newPoints,
+        streak_days: newStreak,
+        last_sync_at: now.toISOString()
+      })
+      .eq('id', userId);
+  }
+
   return data;
 }

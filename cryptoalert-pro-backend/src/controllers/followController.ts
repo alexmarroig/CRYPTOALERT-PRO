@@ -98,3 +98,36 @@ export async function listFollowers(req: Request, res: Response) {
 
   return res.json({ followers: data });
 }
+
+export async function getFriendRanking(req: Request, res: Response) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // 1. Get list of following users
+  const { data: following, error: followingError } = await supabaseAdmin
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', req.user.id);
+
+  if (followingError) {
+    return res.status(500).json({ error: followingError.message });
+  }
+
+  const ids = (following ?? []).map((f) => f.following_id);
+  ids.push(req.user.id); // Include self in ranking
+
+  // 2. Get 30d performance for these users
+  const { data: snapshots, error: snapshotError } = await supabaseAdmin
+    .from('portfolios_snapshot')
+    .select('user_id, change_pct_30d')
+    .in('user_id', ids)
+    .order('change_pct_30d', { ascending: false })
+    .limit(100);
+
+  if (snapshotError) {
+    return res.status(500).json({ error: snapshotError.message });
+  }
+
+  return res.json({ ranking: snapshots });
+}
