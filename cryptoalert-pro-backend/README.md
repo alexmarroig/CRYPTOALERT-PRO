@@ -103,6 +103,16 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 ## OpenAPI
 - `docs/openapi.json`
 
+## Testing
+To run the full test suite (including new features):
+```bash
+npm test
+```
+To run specific endpoint tests:
+```bash
+npm run test:endpoints
+```
+
 ## Deploy
 Compatível com Railway/Render/Vercel Serverless. Garanta:
 - Secrets e ENV configurados

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase.js';
 import { notifyFollowers } from '../services/notifyService.js';
+import { updateInfluencerStats } from '../services/influencerStats.js';
 
 const createAlertSchema = z.object({
   asset: z.string().min(1),
@@ -117,6 +118,10 @@ export async function updateAlertStatus(req: Request, res: Response) {
 
   if (error) {
     return res.status(500).json({ error: error.message });
+  }
+
+  if (parse.data.status === 'closed') {
+    await updateInfluencerStats(req.user.id);
   }
 
   return res.json({ alert: data });

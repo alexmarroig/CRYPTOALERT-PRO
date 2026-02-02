@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase.js';
 import { decryptApiKey, encryptApiKey } from '../utils/encryption.js';
 import { syncExchange } from '../utils/ccxt.js';
+import { checkPortfolioAlerts } from './portfolioMonitor.js';
 
 type Exchange = 'binance' | 'okx';
 
@@ -69,6 +70,9 @@ export async function syncPortfolioSnapshot(userId: string) {
   if (upsertError) {
     throw upsertError;
   }
+
+  // Check for portfolio drop alerts
+  await checkPortfolioAlerts(userId, totalValue, normalizedAssets);
 
   // Update streaks and points
   const { data: profile } = await supabaseAdmin

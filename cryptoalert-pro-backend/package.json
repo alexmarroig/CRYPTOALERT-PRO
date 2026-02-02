@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint . --ext .ts",
-    "test": "node --loader ts-node/esm --test"
+    "test": "node --loader ts-node/esm --test tests/*.test.ts",
+    "test:endpoints": "node --loader ts-node/esm --test tests/endpoints.test.ts"
   },
   "engines": {
     "node": "20.x"
