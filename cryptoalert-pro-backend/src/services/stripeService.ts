@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../config/supabase.js';
 
 type Plan = 'pro' | 'vip';
 
-export async function createCheckoutSession(email: string, userId: string, plan: Plan) {
+export async function createCheckoutSession(email: string, userId: string, plan: Plan, referrerId?: string) {
   const priceId = plan === 'pro' ? env.STRIPE_PRICE_PRO : env.STRIPE_PRICE_VIP;
   if (!priceId) {
     throw new Error('Missing Stripe price configuration');
@@ -18,24 +18,23 @@ export async function createCheckoutSession(email: string, userId: string, plan:
     subscription_data: {
       metadata: {
         user_id: userId,
-        plan
+        plan,
+        referrer_id: referrerId ?? ''
       }
     },
     success_url: `${env.FRONTEND_URL ?? 'https://cryptoalert.pro'}/billing/success`,
     cancel_url: `${env.FRONTEND_URL ?? 'https://cryptoalert.pro'}/billing/cancel`,
     metadata: {
       user_id: userId,
-      plan
+      plan,
+      referrer_id: referrerId ?? ''
     }
   });
 
   return session;
 }
 
-export async function handleStripeWebhook(event: {
-  type: string;
-  data: { object: Record<string, unknown> };
-}) {
+export async function handleStripeWebhook(event: any) {
   if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated') {
     const subscription = event.data.object as {
       id: string;

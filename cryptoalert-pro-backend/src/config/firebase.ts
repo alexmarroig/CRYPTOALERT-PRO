@@ -5,6 +5,7 @@ const serviceAccountRaw = env.FCM_SERVICE_ACCOUNT_JSON ?? env.FIREBASE_SERVICE_A
 const serviceAccount = JSON.parse(serviceAccountRaw);
 
 if (!admin.apps.length) {
+  const isTest = process.env.NODE_ENV === 'test';
   if (isTest) {
     admin.initializeApp({ projectId: env.FIREBASE_PROJECT_ID });
   } else {

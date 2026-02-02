@@ -6,7 +6,8 @@ import { supabaseAdmin } from '../config/supabase.js';
 import { createCheckoutSession, handleStripeWebhook } from '../services/stripeService.js';
 
 const checkoutSchema = z.object({
-  plan: z.enum(['pro', 'vip'])
+  plan: z.enum(['pro', 'vip']),
+  referrerId: z.string().uuid().optional()
 });
 
 export async function createCheckout(req: Request, res: Response) {
@@ -19,7 +20,7 @@ export async function createCheckout(req: Request, res: Response) {
     return res.status(400).json({ error: parse.error.flatten() });
   }
 
-  const session = await createCheckoutSession(req.user.email, req.user.id, parse.data.plan);
+  const session = await createCheckoutSession(req.user.email, req.user.id, parse.data.plan, parse.data.referrerId);
   return res.json({ checkout_url: session.url });
 }
 
