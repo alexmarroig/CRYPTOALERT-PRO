@@ -21,7 +21,16 @@ const envSchema = z.object({
   REDIS_URL: z.string().min(10).optional(),
   JWT_SECRET: z.string().min(16),
   ENCRYPTION_KEY: z.string().min(32),
-  COINGECKO_API_KEY: z.string().optional()
+  COINGECKO_API_KEY: z.string().optional(),
+  DEV_SEED_KEY: z.string().optional(),
+  ADMIN_EMAIL: z.string().email().optional(),
+  ADMIN_PASSWORD: z.string().min(6).optional(),
+  EXPERT_EMAIL: z.string().email().optional(),
+  EXPERT_PASSWORD: z.string().min(6).optional(),
+  PREMIUM_EMAIL: z.string().email().optional(),
+  PREMIUM_PASSWORD: z.string().min(6).optional(),
+  PREMIUM_PLAN: z.enum(['pro', 'vip']).optional(),
+  PORTFOLIO_CURRENCY: z.string().optional()
 }).refine((data) => data.STRIPE_SECRET || data.STRIPE_SECRET_KEY, {
   message: 'Missing Stripe secret key',
   path: ['STRIPE_SECRET']

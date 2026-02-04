@@ -10,6 +10,9 @@ import { influencerRoutes } from './influencerRoutes.js';
 import { notifyRoutes } from './notifyRoutes.js';
 import { billingRoutes } from './billingRoutes.js';
 import { rankingRoutes } from './rankingRoutes.js';
+import { newsRoutes } from './newsRoutes.js';
+import { expertsRoutes } from './expertsRoutes.js';
+import { devRoutes } from './devRoutes.js';
 
 export const v1Routes = Router();
 
@@ -24,3 +27,6 @@ v1Routes.use('/influencer', influencerRoutes);
 v1Routes.use('/', notifyRoutes);
 v1Routes.use('/billing', billingRoutes);
 v1Routes.use('/', rankingRoutes);
+v1Routes.use('/', newsRoutes);
+v1Routes.use('/', expertsRoutes);
+v1Routes.use('/', devRoutes);

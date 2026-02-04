@@ -144,7 +144,23 @@
           "200": {
             "description": "Lista de alertas"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "closed",
+                "all"
+              ]
+            },
+            "description": "Filtro de status (default active)"
+          }
+        ]
       },
       "post": {
         "summary": "Cria alerta",
@@ -319,6 +335,133 @@
         "responses": {
           "200": {
             "description": "Webhook processado"
+          }
+        }
+      }
+    },
+    "/news": {
+      "get": {
+        "summary": "Lista notícias com cache e proxy",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pt",
+                "en"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de notícias normalizadas"
+          }
+        }
+      }
+    },
+    "/news/categories": {
+      "get": {
+        "summary": "Lista categorias de notícias",
+        "responses": {
+          "200": {
+            "description": "Categorias de notícias"
+          }
+        }
+      }
+    },
+    "/market/fear-greed": {
+      "get": {
+        "summary": "Índice de medo e ganância (proxy)",
+        "responses": {
+          "200": {
+            "description": "Índice Fear & Greed"
+          }
+        }
+      }
+    },
+    "/experts": {
+      "get": {
+        "summary": "Lista experts para discovery",
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista paginada de experts"
+          }
+        }
+      }
+    },
+    "/experts/{username}": {
+      "get": {
+        "summary": "Detalhe público do expert",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil público do expert"
+          }
+        }
+      }
+    },
+    "/dev/seed": {
+      "post": {
+        "summary": "Seed de contas e conteúdo demo (dev only)",
+        "responses": {
+          "200": {
+            "description": "Seed executado"
           }
         }
       }

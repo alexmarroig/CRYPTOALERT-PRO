@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase.js';
 import { createInvite, revokeInvite } from '../services/inviteService.js';
+import { logger } from '../utils/logger.js';
 
 const inviteSchema = z.object({
   email: z.string().email()
@@ -19,6 +20,7 @@ export async function createInfluencerInvite(req: Request, res: Response) {
 
   try {
     const invite = await createInvite(parse.data.email, req.user.id);
+    logger.info('audit.invite.create', { invite_id: invite.id, invited_by: req.user.id });
     return res.status(201).json({ invite });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to create invite';
@@ -44,6 +46,7 @@ export async function revokeInfluencerInvite(req: Request, res: Response) {
 
   try {
     const invite = await revokeInvite(id);
+    logger.info('audit.invite.revoke', { invite_id: invite.id, revoked_by: req.user?.id ?? null });
     return res.json({ invite });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to revoke invite';
