@@ -4,7 +4,6 @@ import { v1Routes } from './routes/v1/index.js';
 import { apiRateLimit } from './middleware/rateLimit.js';
 import { auditLogger } from './middleware/audit.js';
 import { logger } from './utils/logger.js';
-import { auditLogger } from './middleware/audit.js';
 
 export function createApp() {
   const app = express();

@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase.js';
 import { notifyFollowers } from '../services/notifyService.js';
+import { logger } from '../utils/logger.js';
 
 const createAlertSchema = z.object({
   asset: z.string().min(1),
@@ -18,12 +19,16 @@ const updateStatusSchema = z.object({
 });
 
 export async function listAlerts(req: Request, res: Response) {
-  const { filter = 'all', scope = 'all', creator } = req.query as Record<string, string>;
+  const { filter = 'all', scope = 'all', creator, status = 'active' } = req.query as Record<string, string>;
 
   let query = supabaseAdmin.from('alerts').select('*');
 
   if (filter === 'buy' || filter === 'sell') {
     query = query.eq('side', filter);
+  }
+
+  if (status === 'active' || status === 'closed') {
+    query = query.eq('status', status);
   }
 
   if (scope === 'creator' && creator) {
@@ -85,6 +90,8 @@ export async function createAlert(req: Request, res: Response) {
   if (error) {
     return res.status(500).json({ error: error.message });
   }
+
+  logger.info('audit.alert.create', { alert_id: data.id, creator_id: req.user.id });
 
   await notifyFollowers(req.user.id, {
     title: `Novo alerta de ${parse.data.asset}`,

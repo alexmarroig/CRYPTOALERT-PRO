@@ -72,3 +72,29 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   return next();
 }
+
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return next();
+  }
+
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !data.user || !data.user.email) {
+    return next();
+  }
+
+  const profile = await ensureProfile(data.user.id, data.user.email);
+  if (profile) {
+    req.authToken = token;
+    req.user = {
+      id: profile.id,
+      email: profile.email,
+      username: profile.username,
+      role: profile.role,
+      plan: profile.plan
+    };
+  }
+
+  return next();
+}

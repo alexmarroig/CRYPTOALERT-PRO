@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase.js';
 import { connectExchange, syncPortfolioSnapshot, testExchangeConnection } from '../services/portfolioSync.js';
+import { logger } from '../utils/logger.js';
 
 const connectSchema = z.object({
   exchange: z.enum(['binance', 'okx']),
@@ -24,6 +25,7 @@ export async function connectPortfolio(req: Request, res: Response) {
   }
 
   await connectExchange(req.user.id, parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
+  logger.info('audit.portfolio.connect', { user_id: req.user.id, exchange: parse.data.exchange });
   return res.status(201).json({ connected: true });
 }
 
@@ -87,6 +89,8 @@ export async function updatePortfolioVisibility(req: Request, res: Response) {
     return res.status(500).json({ error: error.message });
   }
 
+  logger.info('audit.portfolio.visibility', { user_id: req.user.id, visibility: parse.data.visibility });
+
   return res.json({ visibility: data });
 }
 
@@ -110,6 +114,7 @@ export async function getPublicPortfolio(req: Request, res: Response) {
     .single();
 
   const mode = visibility?.visibility ?? 'private';
+  const currency = process.env.PORTFOLIO_CURRENCY ?? 'USD';
   if (mode === 'private') {
     return res.status(403).json({ error: 'Portfolio is private' });
   }
@@ -152,9 +157,16 @@ export async function getPublicPortfolio(req: Request, res: Response) {
     return res.json({
       username: profile.username,
       change_pct_30d: snapshot?.change_pct_30d ?? 0,
-      top_assets_percent: topAssets
+      top_assets_percent: topAssets,
+      currency,
+      as_of: snapshot?.updated_at ?? new Date().toISOString()
     });
   }
 
-  return res.json({ username: profile.username, snapshot });
+  return res.json({
+    username: profile.username,
+    snapshot,
+    currency,
+    as_of: snapshot?.updated_at ?? new Date().toISOString()
+  });
 }
