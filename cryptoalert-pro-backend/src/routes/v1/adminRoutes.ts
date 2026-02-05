@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createInfluencerInvite, listInfluencers, listInvites, revokeInfluencerInvite } from '../../controllers/adminController.js';
+import { createInfluencerInvite, getIncidentsPanel, listInfluencers, listInvites, revokeInfluencerInvite } from '../../controllers/adminController.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { requireRole } from '../../middleware/roleCheck.js';
 import { invitesRateLimit } from '../../middleware/rateLimit.js';
@@ -10,3 +10,5 @@ adminRoutes.post('/invites', invitesRateLimit, requireAuth, requireRole('admin')
 adminRoutes.get('/invites', invitesRateLimit, requireAuth, requireRole('admin'), listInvites);
 adminRoutes.post('/invites/:id/revoke', invitesRateLimit, requireAuth, requireRole('admin'), revokeInfluencerInvite);
 adminRoutes.get('/influencers', requireAuth, requireRole('admin'), listInfluencers);
+
+adminRoutes.get('/incidents', requireAuth, requireRole('admin'), getIncidentsPanel);
