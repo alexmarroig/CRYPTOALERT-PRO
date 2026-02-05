@@ -27,84 +27,72 @@ const opsEventSchema = z.object({
   occurred_at: z.string().datetime().optional()
 });
 
-const analyzeSchema = z.object({
-  service_name: z.string().min(2),
-  lookback_minutes: z.number().int().min(15).max(24 * 60).optional()
-});
-
-const feedbackSchema = z.object({
-  verdict: z.enum(['true_positive', 'false_positive', 'needs_tuning']),
-  notes: z.string().max(1500).optional()
-});
+const analyzeSchema = z.object({ service_name: z.string().min(2), lookback_minutes: z.number().int().min(15).max(24 * 60).optional() });
+const feedbackSchema = z.object({ verdict: z.enum(['true_positive', 'false_positive', 'needs_tuning']), notes: z.string().max(1500).optional() });
 
 export async function ingestOpsTelemetry(req: Request, res: Response) {
   const parsed = telemetrySchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   try {
-    const telemetry = await ingestTelemetryPoint(parsed.data);
+    const telemetry = await ingestTelemetryPoint({
+      ...parsed.data,
+      idempotency_key: req.header('Idempotency-Key') ?? req.header('X-Idempotency-Key') ?? undefined
+    });
     return res.status(201).json({ telemetry });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to ingest telemetry';
+    const message = error instanceof Error ? error.message : 'Falha ao ingerir telemetria';
     return res.status(500).json({ error: message });
   }
 }
 
 export async function createOpsEvent(req: Request, res: Response) {
   const parsed = opsEventSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   try {
-    const event = await recordOpsEvent(parsed.data);
+    const event = await recordOpsEvent({
+      ...parsed.data,
+      idempotency_key: req.header('Idempotency-Key') ?? req.header('X-Idempotency-Key') ?? undefined
+    });
     return res.status(201).json({ event });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to record ops event';
+    const message = error instanceof Error ? error.message : 'Falha ao registrar evento operacional';
     return res.status(500).json({ error: message });
   }
 }
 
 export async function analyzeOpsAnomalies(req: Request, res: Response) {
   const parsed = analyzeSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   try {
     const incidents = await detectOpsAnomalies(parsed.data.service_name, parsed.data.lookback_minutes);
     return res.status(201).json({ incidents });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to analyze anomalies';
+    const message = error instanceof Error ? error.message : 'Falha ao analisar anomalias';
     return res.status(500).json({ error: message });
   }
 }
 
 export async function getOpsIncidents(req: Request, res: Response) {
   const serviceName = req.query.service_name;
-
   if (typeof serviceName !== 'string' || serviceName.length < 2) {
     return res.status(400).json({ error: 'service_name is required' });
   }
 
-  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-
   try {
-    const incidents = await listOpsIncidents(serviceName, status);
+    const incidents = await listOpsIncidents(serviceName, typeof req.query.status === 'string' ? req.query.status : undefined);
     return res.json({ incidents });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to list incidents';
+    const message = error instanceof Error ? error.message : 'Falha ao listar incidentes';
     return res.status(500).json({ error: message });
   }
 }
 
 export async function submitIncidentFeedback(req: Request, res: Response) {
   const parsed = feedbackSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten() });
-  }
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   try {
     const feedback = await registerIncidentFeedback({
@@ -113,10 +101,9 @@ export async function submitIncidentFeedback(req: Request, res: Response) {
       verdict: parsed.data.verdict,
       notes: parsed.data.notes
     });
-
     return res.status(201).json({ feedback });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to register feedback';
+    const message = error instanceof Error ? error.message : 'Falha ao registrar feedback';
     return res.status(500).json({ error: message });
   }
 }

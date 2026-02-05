@@ -20,7 +20,7 @@ const envSchema = z.object({
   FCM_SERVICE_ACCOUNT_JSON: z.string().min(10).optional(),
   REDIS_URL: z.string().min(10).optional(),
   JWT_SECRET: z.string().min(16),
-  ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be 64 hex characters'),
+  ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{32,64}$/, 'ENCRYPTION_KEY must be 32-64 hex characters'),
   COINGECKO_API_KEY: z.string().optional(),
   DEV_SEED_KEY: z.string().optional(),
   ADMIN_EMAIL: z.string().email().optional(),

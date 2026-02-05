@@ -5,6 +5,7 @@ export type SignalType = 'explosion_5xx' | 'conversion_drop' | 'timeout_spike' |
 export type EventType = 'deploy' | 'traffic' | 'provider_failure' | 'manual';
 
 interface TelemetryPoint {
+  idempotency_key?: string | null;
   metric_type: MetricType;
   service_name: string;
   provider?: string | null;
@@ -15,6 +16,7 @@ interface TelemetryPoint {
 }
 
 interface OpsEvent {
+  idempotency_key?: string | null;
   event_type: EventType;
   service_name?: string | null;
   provider?: string | null;
@@ -53,35 +55,45 @@ const RECOMMENDATIONS: Record<SignalType, string[]> = {
 };
 
 export async function ingestTelemetryPoint(point: TelemetryPoint) {
+  if (point.idempotency_key) {
+    const { data: existing } = await supabaseAdmin
+      .from('ops_telemetry')
+      .select('*')
+      .contains('metadata', { idempotency_key: point.idempotency_key })
+      .maybeSingle();
+
+    if (existing) return existing;
+  }
+
   const payload = {
     ...point,
-    metadata: point.metadata ?? {},
+    metadata: { ...(point.metadata ?? {}), ...(point.idempotency_key ? { idempotency_key: point.idempotency_key } : {}) },
     recorded_at: point.recorded_at ?? new Date().toISOString()
   };
 
-  const { data, error } = await supabaseAdmin
-    .from('ops_telemetry')
-    .insert(payload)
-    .select('*')
-    .single();
-
+  const { data, error } = await supabaseAdmin.from('ops_telemetry').insert(payload).select('*').single();
   if (error) throw new Error(error.message);
   return data;
 }
 
 export async function recordOpsEvent(event: OpsEvent) {
+  if (event.idempotency_key) {
+    const { data: existing } = await supabaseAdmin
+      .from('ops_events')
+      .select('*')
+      .contains('metadata', { idempotency_key: event.idempotency_key })
+      .maybeSingle();
+
+    if (existing) return existing;
+  }
+
   const payload = {
     ...event,
-    metadata: event.metadata ?? {},
+    metadata: { ...(event.metadata ?? {}), ...(event.idempotency_key ? { idempotency_key: event.idempotency_key } : {}) },
     occurred_at: event.occurred_at ?? new Date().toISOString()
   };
 
-  const { data, error } = await supabaseAdmin
-    .from('ops_events')
-    .insert(payload)
-    .select('*')
-    .single();
-
+  const { data, error } = await supabaseAdmin.from('ops_events').insert(payload).select('*').single();
   if (error) throw new Error(error.message);
   return data;
 }
