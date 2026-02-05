@@ -8,6 +8,10 @@ const registerSchema = z.object({
   device: z.string().min(1)
 });
 
+export const notifyControllerDeps = {
+  notifyFollowers
+};
+
 export async function registerPushToken(req: Request, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -38,7 +42,7 @@ export async function testNotification(req: Request, res: Response) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  await notifyFollowers(req.user.id, {
+  await notifyControllerDeps.notifyFollowers(req.user.id, {
     title: 'Teste de notificação',
     body: 'Se você recebeu isso, o push está configurado.'
   });

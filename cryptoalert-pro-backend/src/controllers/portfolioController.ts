@@ -24,6 +24,11 @@ const visibilitySchema = z.object({
   visibility: z.enum(['private', 'friends', 'public', 'percent'])
 });
 
+export const portfolioControllerDeps = {
+  connectExchange,
+  testExchangeConnection,
+  syncPortfolioSnapshot
+};
 export async function connectPortfolio(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.user) {
@@ -57,6 +62,9 @@ export async function connectPortfolio(req: Request, res: Response) {
     return res.status(400).json({ error: parse.error.flatten() });
   }
 
+  await portfolioControllerDeps.connectExchange(req.user.id, parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
+  logger.info('audit.portfolio.connect', { user_id: req.user.id, exchange: parse.data.exchange });
+  return res.status(201).json({ connected: true });
     const parse = connectSchema.safeParse(req.body);
     if (!parse.success) {
       throw new AppError('Invalid payload', 400, { code: 'VALIDATION_ERROR', details: parse.error.flatten() });
@@ -112,6 +120,8 @@ export async function getPortfolioPerformance(req: Request, res: Response) {
     return res.status(400).json({ error: parse.error.flatten() });
   }
 
+  await portfolioControllerDeps.testExchangeConnection(parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
+  return res.json({ ok: true });
   const startDate = rangeToDate(parse.data.range);
   const { data, error } = await supabaseAdmin
     .from('portfolios_history')
@@ -143,6 +153,8 @@ export async function getPortfolioComposition(req: Request, res: Response) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const snapshot = await portfolioControllerDeps.syncPortfolioSnapshot(req.user.id);
+  return res.json({ snapshot });
   const { data: snapshot, error } = await supabaseAdmin
     .from('portfolios_snapshot')
     .select('assets, total_value')

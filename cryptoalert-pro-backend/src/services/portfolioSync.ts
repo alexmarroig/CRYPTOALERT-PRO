@@ -25,12 +25,18 @@ type HoldingSummary = {
   marketValue: number;
 };
 
+export const portfolioSyncDeps = {
+  syncExchange,
+  encryptApiKey,
+  decryptApiKey
+};
+
 export async function testExchangeConnection(exchange: Exchange, apiKey: string, apiSecret: string) {
-  await syncExchange(exchange, { key: apiKey, secret: apiSecret });
+  await portfolioSyncDeps.syncExchange(exchange, { key: apiKey, secret: apiSecret });
 }
 
 export async function connectExchange(userId: string, exchange: Exchange, apiKey: string, apiSecret: string) {
-  const encryptedSecret = encryptApiKey(apiSecret);
+  const encryptedSecret = portfolioSyncDeps.encryptApiKey(apiSecret);
 
   const { error } = await supabaseAdmin
     .from('exchange_connections')
@@ -167,8 +173,8 @@ export async function syncPortfolioSnapshot(userId: string) {
 
   const assets = [];
   for (const connection of connections ?? []) {
-    const secret = decryptApiKey(connection.api_secret_encrypted);
-    const holdings = await syncExchange(connection.exchange, {
+    const secret = portfolioSyncDeps.decryptApiKey(connection.api_secret_encrypted);
+    const holdings = await portfolioSyncDeps.syncExchange(connection.exchange, {
       key: connection.api_key,
       secret
     });

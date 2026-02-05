@@ -7,6 +7,10 @@ const createPostSchema = z.object({
   text: z.string().min(1)
 });
 
+export const postsControllerDeps = {
+  notifyFollowers
+};
+
 export async function listPosts(req: Request, res: Response) {
   const { scope = 'all', creator } = req.query as Record<string, string>;
 
@@ -66,7 +70,7 @@ export async function createPost(req: Request, res: Response) {
     return res.status(500).json({ error: error.message });
   }
 
-  await notifyFollowers(req.user.id, {
+  await postsControllerDeps.notifyFollowers(req.user.id, {
     title: 'Novo post do influencer',
     body: parse.data.text.slice(0, 80),
     data: { post_id: data.id }

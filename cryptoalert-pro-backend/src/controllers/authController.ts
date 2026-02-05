@@ -7,6 +7,10 @@ const acceptInviteSchema = z.object({
   token: z.string().uuid()
 });
 
+export const authControllerDeps = {
+  acceptInvite
+};
+
 export async function acceptInfluencerInvite(req: Request, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -18,7 +22,7 @@ export async function acceptInfluencerInvite(req: Request, res: Response) {
   }
 
   try {
-    const profile = await acceptInvite(req.user.id, req.user.email, parse.data.token);
+    const profile = await authControllerDeps.acceptInvite(req.user.id, req.user.email, parse.data.token);
     logger.info('audit.invite.accept', { invite_token: parse.data.token, user_id: req.user.id });
     return res.json({ profile });
   } catch (error) {
