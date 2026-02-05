@@ -13,6 +13,7 @@ import { rankingRoutes } from './rankingRoutes.js';
 import { newsRoutes } from './newsRoutes.js';
 import { expertsRoutes } from './expertsRoutes.js';
 import { devRoutes } from './devRoutes.js';
+import { incidentRiskRoutes } from './incidentRiskRoutes.js';
 
 export const v1Routes = Router();
 
@@ -30,3 +31,5 @@ v1Routes.use('/', rankingRoutes);
 v1Routes.use('/', newsRoutes);
 v1Routes.use('/', expertsRoutes);
 v1Routes.use('/', devRoutes);
+
+v1Routes.use('/incident-risk', incidentRiskRoutes);
