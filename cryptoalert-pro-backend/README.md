@@ -103,6 +103,12 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 ## OpenAPI
 - `docs/openapi.json`
 
+
+## Monitoramento de jornadas (staging)
+- Runner sintético: `npm run journeys:staging`
+- Gate de KPI/regressão: `npm run journeys:gate`
+- Documentação: `docs/journey-observability.md`
+
 ## Deploy
 Compatível com Railway/Render/Vercel Serverless. Garanta:
 - Secrets e ENV configurados
