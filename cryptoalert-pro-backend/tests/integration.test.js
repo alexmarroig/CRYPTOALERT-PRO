@@ -15,8 +15,14 @@ const requiredEnv = {
   FIREBASE_PROJECT_ID: 'test-project',
   FCM_SERVICE_ACCOUNT_JSON: '{"type":"service_account","project_id":"test","private_key":"-----BEGIN PRIVATE KEY-----\\nTEST\\n-----END PRIVATE KEY-----\\n","client_email":"test@example.com"}',
   JWT_SECRET: 'jwt_secret_minimum_length',
-  ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef',
-  DEV_SEED_KEY: 'dev_seed_key'
+  ENCRYPTION_KEY: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+  DEV_SEED_KEY: 'dev_seed_key',
+  ADMIN_EMAIL: 'seed-admin@example.com',
+  ADMIN_PASSWORD: 'Admin123!',
+  EXPERT_EMAIL: 'seed-expert@example.com',
+  EXPERT_PASSWORD: 'Expert123!',
+  PREMIUM_EMAIL: 'seed-premium@example.com',
+  PREMIUM_PASSWORD: 'Premium123!'
 };
 
 for (const [key, value] of Object.entries(requiredEnv)) {
@@ -228,7 +234,10 @@ const state = {
   alerts: [],
   posts: [],
   portfolios_snapshot: [],
-  portfolio_visibility: []
+  portfolio_visibility: [],
+  exchange_connections: [],
+  push_tokens: [],
+  stripe_customers: []
 };
 
 const authUsers = new Map();
@@ -248,6 +257,9 @@ beforeEach(async () => {
   state.posts = [];
   state.portfolios_snapshot = [];
   state.portfolio_visibility = [];
+  state.exchange_connections = [];
+  state.push_tokens = [];
+  state.stripe_customers = [];
 
   authUsers.clear();
   authUsers.set('admin-token', { id: '11111111-1111-1111-1111-111111111111', email: 'admin@example.com' });
@@ -256,6 +268,12 @@ beforeEach(async () => {
   authUsers.set('friend-token', { id: '44444444-4444-4444-4444-444444444444', email: 'friend@example.com' });
 
   supabaseAdmin.from = (table) => new QueryBuilder(table, state);
+  const { stripe } = await import('../src/config/stripe.js');
+  stripe.checkout.sessions.create = async () => ({ url: 'https://checkout.local' });
+
+  const { portfolioSyncDeps } = await import('../src/services/portfolioSync.js');
+  portfolioSyncDeps.syncExchange = async () => ([]);
+
   supabaseAdmin.auth = {
     getUser: async (token) => {
       const user = authUsers.get(token);
@@ -416,4 +434,189 @@ test('news proxy returns normalized items', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.items.length, 1);
   assert.equal(response.body.items[0].id, 'news-1');
+});
+
+test('admin, billing, influencer e notify exigem auth/role corretamente', async () => {
+  const app = await loadApp();
+
+  let response = await request(app).get('/v1/admin/invites');
+  assert.equal(response.status, 401);
+
+  response = await request(app)
+    .get('/v1/admin/invites')
+    .set('Authorization', 'Bearer user-token');
+  assert.equal(response.status, 403);
+
+  response = await request(app)
+    .get('/v1/influencer/metrics/me')
+    .set('Authorization', 'Bearer user-token');
+  assert.equal(response.status, 403);
+
+  response = await request(app).post('/v1/notify/test');
+  assert.equal(response.status, 401);
+
+  response = await request(app)
+    .get('/v1/billing/status')
+    .set('Authorization', 'Bearer user-token');
+  assert.equal(response.status, 200);
+});
+
+test('rotas de experts, ranking e feed social retornam sucesso', async () => {
+  state.portfolio_visibility.push({ user_id: '22222222-2222-2222-2222-222222222222', visibility: 'percent' });
+  state.portfolios_snapshot.push({
+    user_id: '22222222-2222-2222-2222-222222222222',
+    change_pct_30d: 8,
+    total_value: 1000,
+    assets: [{ symbol: 'BTC', pct: 60 }],
+    updated_at: '2024-01-01'
+  });
+
+  const app = await loadApp();
+  let response = await request(app).get('/v1/ranking?limit=1');
+  assert.equal(response.status, 200);
+
+  response = await request(app).get('/v1/experts?limit=1&offset=0');
+  assert.equal(response.status, 200);
+
+  response = await request(app).get('/v1/experts/expert');
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .get('/v1/followers')
+    .set('Authorization', 'Bearer user-token');
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .get('/v1/following')
+    .set('Authorization', 'Bearer user-token');
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .get('/v1/ranking/friends')
+    .set('Authorization', 'Bearer user-token');
+  assert.equal(response.status, 200);
+});
+
+test('rotas de posts/alerts/auth/profile/portfolio cobrem validação e sucesso', async () => {
+  const app = await loadApp();
+
+  let response = await request(app)
+    .post('/v1/posts')
+    .set('Authorization', 'Bearer user-token')
+    .send({ text: 'x' });
+  assert.equal(response.status, 403);
+
+  response = await request(app)
+    .post('/v1/posts')
+    .set('Authorization', 'Bearer expert-token')
+    .send({ text: 'novo post' });
+  assert.equal(response.status, 201);
+
+  response = await request(app)
+    .patch('/v1/me')
+    .set('Authorization', 'Bearer user-token')
+    .send({ username: 'xy' });
+  assert.equal(response.status, 400);
+
+  response = await request(app)
+    .patch('/v1/me')
+    .set('Authorization', 'Bearer user-token')
+    .send({ display_name: 'User Updated' });
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .post('/v1/portfolio/connect')
+    .set('Authorization', 'Bearer user-token')
+    .send({ exchange: 'binance', apiKey: 'k', apiSecret: 's' });
+  assert.equal(response.status, 201);
+
+  response = await request(app)
+    .post('/v1/portfolio/test-connection')
+    .set('Authorization', 'Bearer user-token')
+    .send({ exchange: 'binance', apiKey: 'k', apiSecret: 's' });
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .patch('/v1/portfolio/visibility')
+    .set('Authorization', 'Bearer user-token')
+    .send({ visibility: 'public' });
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .post('/v1/auth/accept-invite')
+    .set('Authorization', 'Bearer user-token')
+    .send({ token: 'invalid' });
+  assert.equal(response.status, 400);
+});
+
+test('dependências externas com erro retornam 5xx/502 nas rotas', async () => {
+  const app = await loadApp();
+
+  globalThis.fetch = async () => ({ ok: false, json: async () => ({}) });
+  let response = await request(app).get('/v1/news');
+  assert.equal(response.status, 502);
+
+  const { stripe } = await import('../src/config/stripe.js');
+  stripe.webhooks.constructEvent = () => { throw new Error('invalid signature'); };
+  response = await request(app)
+    .post('/v1/billing/webhook')
+    .set('stripe-signature', 'sig')
+    .send('raw');
+  assert.equal(response.status, 400);
+});
+
+test('cobre rotas remanescentes de v1', async () => {
+  const app = await loadApp();
+
+  let response = await request(app)
+    .post('/v1/admin/invites')
+    .set('Authorization', 'Bearer admin-token')
+    .send({ email: 'friend@example.com' });
+  const inviteId = response.body.invite.id;
+
+  response = await request(app)
+    .post(`/v1/admin/invites/${inviteId}/revoke`)
+    .set('Authorization', 'Bearer admin-token');
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .get('/v1/admin/influencers')
+    .set('Authorization', 'Bearer admin-token');
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .post('/v1/push/register')
+    .set('Authorization', 'Bearer user-token')
+    .send({ fcmToken: 'token-abc', device: 'ios' });
+  assert.equal(response.status, 201);
+
+  response = await request(app)
+    .post('/v1/billing/checkout')
+    .set('Authorization', 'Bearer user-token')
+    .send({ plan: 'pro' });
+  assert.equal(response.status, 200);
+
+  globalThis.fetch = async (url) => ({
+    ok: true,
+    json: async () => String(url).includes('fear-greed')
+      ? { data: { value: 55, value_classification: 'Neutral', updated_at: '2024-01-01T00:00:00.000Z' } }
+      : { categories: ['market'] }
+  });
+
+  response = await request(app).get('/v1/news/categories');
+  assert.equal(response.status, 200);
+
+  response = await request(app).get('/v1/market/fear-greed');
+  assert.equal(response.status, 200);
+
+  response = await request(app)
+    .patch('/v1/alerts/alert-1/status')
+    .set('Authorization', 'Bearer expert-token')
+    .send({ status: 'closed' });
+  assert.ok([200, 404].includes(response.status));
+
+  response = await request(app)
+    .post('/v1/dev/seed')
+    .set('X-Dev-Seed-Key', process.env.DEV_SEED_KEY);
+  assert.equal(response.status, 200);
 });

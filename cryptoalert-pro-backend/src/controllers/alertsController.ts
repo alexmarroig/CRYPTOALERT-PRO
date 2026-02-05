@@ -18,6 +18,10 @@ const updateStatusSchema = z.object({
   status: z.enum(['active', 'closed'])
 });
 
+export const alertsControllerDeps = {
+  notifyFollowers
+};
+
 export async function listAlerts(req: Request, res: Response) {
   const { filter = 'all', scope = 'all', creator, status = 'active' } = req.query as Record<string, string>;
 
@@ -93,7 +97,7 @@ export async function createAlert(req: Request, res: Response) {
 
   logger.info('audit.alert.create', { alert_id: data.id, creator_id: req.user.id });
 
-  await notifyFollowers(req.user.id, {
+  await alertsControllerDeps.notifyFollowers(req.user.id, {
     title: `Novo alerta de ${parse.data.asset}`,
     body: `${parse.data.side === 'buy' ? 'Compra' : 'Venda'} · confira agora`,
     data: { alert_id: data.id }

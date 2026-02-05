@@ -14,6 +14,12 @@ const visibilitySchema = z.object({
   visibility: z.enum(['private', 'friends', 'public', 'percent'])
 });
 
+export const portfolioControllerDeps = {
+  connectExchange,
+  testExchangeConnection,
+  syncPortfolioSnapshot
+};
+
 export async function connectPortfolio(req: Request, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -24,7 +30,7 @@ export async function connectPortfolio(req: Request, res: Response) {
     return res.status(400).json({ error: parse.error.flatten() });
   }
 
-  await connectExchange(req.user.id, parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
+  await portfolioControllerDeps.connectExchange(req.user.id, parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
   logger.info('audit.portfolio.connect', { user_id: req.user.id, exchange: parse.data.exchange });
   return res.status(201).json({ connected: true });
 }
@@ -35,7 +41,7 @@ export async function testPortfolioConnection(req: Request, res: Response) {
     return res.status(400).json({ error: parse.error.flatten() });
   }
 
-  await testExchangeConnection(parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
+  await portfolioControllerDeps.testExchangeConnection(parse.data.exchange, parse.data.apiKey, parse.data.apiSecret);
   return res.json({ ok: true });
 }
 
@@ -44,7 +50,7 @@ export async function syncPortfolio(req: Request, res: Response) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const snapshot = await syncPortfolioSnapshot(req.user.id);
+  const snapshot = await portfolioControllerDeps.syncPortfolioSnapshot(req.user.id);
   return res.json({ snapshot });
 }
 

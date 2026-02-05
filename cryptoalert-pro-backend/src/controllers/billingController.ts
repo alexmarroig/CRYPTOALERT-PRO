@@ -10,6 +10,11 @@ const checkoutSchema = z.object({
   referrerId: z.string().uuid().optional()
 });
 
+export const billingControllerDeps = {
+  createCheckoutSession,
+  handleStripeWebhook
+};
+
 export async function createCheckout(req: Request, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -20,7 +25,7 @@ export async function createCheckout(req: Request, res: Response) {
     return res.status(400).json({ error: parse.error.flatten() });
   }
 
-  const session = await createCheckoutSession(req.user.email, req.user.id, parse.data.plan, parse.data.referrerId);
+  const session = await billingControllerDeps.createCheckoutSession(req.user.email, req.user.id, parse.data.plan, parse.data.referrerId);
   return res.json({ checkout_url: session.url });
 }
 
@@ -51,6 +56,6 @@ export async function webhook(req: Request, res: Response) {
     return res.status(400).send('Webhook signature verification failed.');
   }
 
-  await handleStripeWebhook(event);
+  await billingControllerDeps.handleStripeWebhook(event);
   return res.json({ received: true });
 }

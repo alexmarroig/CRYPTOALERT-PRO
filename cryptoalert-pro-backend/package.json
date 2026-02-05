@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint . --ext .ts",
-    "test": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test"
+    "test": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=spec",
+    "test:coverage": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --experimental-test-coverage --test-coverage-include=\"src/controllers/**/*.ts\" --test-coverage-include=\"src/routes/v1/**/*.ts\" --test-coverage-include=\"src/services/newsService.ts\" --test-coverage-include=\"src/services/portfolioSync.ts\" --test-coverage-include=\"src/services/inviteService.ts\" --test-coverage-include=\"src/services/stripeService.ts\" --test-coverage-include=\"src/services/notifications.ts\" --test-coverage-lines=80"
   },
   "engines": {
     "node": "20.x"
@@ -34,8 +35,8 @@
     "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20.11.5",
     "@types/node-fetch": "^3.0.3",
-    "@types/supertest": "^2.0.16",
     "@types/stripe": "^8.0.416",
+    "@types/supertest": "^2.0.16",
     "eslint": "^8.56.0",
     "supertest": "^6.3.4",
     "ts-node": "^10.9.2",

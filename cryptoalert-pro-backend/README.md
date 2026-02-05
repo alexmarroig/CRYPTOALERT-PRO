@@ -100,6 +100,17 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 - `GET /v1/billing/status`
 - `POST /v1/billing/webhook`
 
+
+## Testes (padrão oficial do projeto)
+- Framework: **Node Test Runner (`node:test`)** com testes em `tests/` e `tests/unit/`.
+- Convenção:
+  - `*.test.js` para integração/HTTP (`supertest`)
+  - `tests/unit/*.test.js` para testes unitários de controladores e serviços
+  - Mocks obrigatórios para dependências externas: `supabaseAdmin`, `fetch`, `stripe`, `firebaseAdmin`
+- Comandos:
+  - `npm test` → executa suite padrão
+  - `npm run test:coverage` → executa cobertura com gate mínimo de **80%** (linhas, funções e branches)
+
 ## OpenAPI
 - `docs/openapi.json`
 

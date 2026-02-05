@@ -8,6 +8,11 @@ const inviteSchema = z.object({
   email: z.string().email()
 });
 
+export const adminControllerDeps = {
+  createInvite,
+  revokeInvite
+};
+
 export async function createInfluencerInvite(req: Request, res: Response) {
   if (!req.user) {
     return res.status(401).json({ error: 'Unauthorized' });
@@ -19,7 +24,7 @@ export async function createInfluencerInvite(req: Request, res: Response) {
   }
 
   try {
-    const invite = await createInvite(parse.data.email, req.user.id);
+    const invite = await adminControllerDeps.createInvite(parse.data.email, req.user.id);
     logger.info('audit.invite.create', { invite_id: invite.id, invited_by: req.user.id });
     return res.status(201).json({ invite });
   } catch (error) {
@@ -45,7 +50,7 @@ export async function revokeInfluencerInvite(req: Request, res: Response) {
   const { id } = req.params;
 
   try {
-    const invite = await revokeInvite(id);
+    const invite = await adminControllerDeps.revokeInvite(id);
     logger.info('audit.invite.revoke', { invite_id: invite.id, revoked_by: req.user?.id ?? null });
     return res.json({ invite });
   } catch (error) {
