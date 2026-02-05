@@ -25,6 +25,7 @@ type FearGreedResult = {
 };
 
 const NEWS_BASE_URL = 'https://news-crypto.vercel.app/api';
+const NEWS_FALLBACK_BASE_URL = process.env.NEWS_FALLBACK_BASE_URL;
 const newsCache = new LruCache<NewsItem[]>(100);
 const categoriesCache = new LruCache<string[]>(5);
 const fearGreedCache = new LruCache<Omit<FearGreedResult, 'cached'>>(5);
@@ -32,6 +33,45 @@ const fearGreedCache = new LruCache<Omit<FearGreedResult, 'cached'>>(5);
 const NEWS_TTL_MS = 60 * 1000;
 const FEAR_GREED_TTL_MS = 5 * 60 * 1000;
 const CATEGORIES_TTL_MS = 24 * 60 * 60 * 1000;
+const EXTERNAL_TIMEOUT_MS = 8_000;
+
+export class ExternalProviderError extends Error {
+  constructor(
+    message: string,
+    readonly code: 'EXTERNAL_PROVIDER_UNAVAILABLE' | 'EXTERNAL_PROVIDER_TIMEOUT' = 'EXTERNAL_PROVIDER_UNAVAILABLE'
+  ) {
+    super(message);
+    this.name = 'ExternalProviderError';
+  }
+}
+
+async function fetchJsonWithTimeout<T>(url: string): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), EXTERNAL_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new ExternalProviderError(`Provider returned status ${response.status}`);
+    }
+    return await response.json() as T;
+  } catch (error) {
+    if (error instanceof ExternalProviderError) {
+      throw error;
+    }
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ExternalProviderError('Provider request timeout', 'EXTERNAL_PROVIDER_TIMEOUT');
+    }
+    throw new ExternalProviderError('Provider request failed');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function getFallbackUrl(path: string): string | null {
+  if (!NEWS_FALLBACK_BASE_URL) return null;
+  return `${NEWS_FALLBACK_BASE_URL.replace(/\/$/, '')}${path}`;
+}
 
 function normalizeAssets(raw: unknown): string[] {
   if (Array.isArray(raw)) {
@@ -119,8 +159,22 @@ export async function fetchNews({
   const response = await instrumentDependency('news_provider', query ? 'search' : 'news', () => fetch(url.toString()));
   if (!response.ok) {
     throw new Error('Failed to fetch news');
+  let payload: { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] };
+  try {
+    payload = await fetchJsonWithTimeout(url.toString());
+  } catch {
+    const fallbackUrl = getFallbackUrl(query ? '/search' : '/news');
+    if (!fallbackUrl) {
+      throw new ExternalProviderError('Failed to fetch news');
+    }
+
+    const fallback = new URL(fallbackUrl);
+    for (const [name, value] of url.searchParams.entries()) {
+      fallback.searchParams.set(name, value);
+    }
+    payload = await fetchJsonWithTimeout(fallback.toString());
   }
-  const payload = await response.json() as { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] };
+
   const rawItems = payload.items ?? payload.data ?? [];
   const items = rawItems.map((item, index) => normalizeNewsItem(item, index));
 
@@ -137,8 +191,17 @@ export async function fetchNewsCategories(): Promise<{ categories: string[]; cac
   const response = await instrumentDependency('news_provider', 'categories', () => fetch(`${NEWS_BASE_URL}/news/categories`));
   if (!response.ok) {
     throw new Error('Failed to fetch categories');
+  let payload: { data?: string[]; categories?: string[] };
+  try {
+    payload = await fetchJsonWithTimeout(`${NEWS_BASE_URL}/news/categories`);
+  } catch {
+    const fallbackUrl = getFallbackUrl('/news/categories');
+    if (!fallbackUrl) {
+      throw new ExternalProviderError('Failed to fetch categories');
+    }
+    payload = await fetchJsonWithTimeout(fallbackUrl);
   }
-  const payload = await response.json() as { data?: string[]; categories?: string[] };
+
   const categories = payload.categories ?? payload.data ?? [];
 
   categoriesCache.set('categories', categories, CATEGORIES_TTL_MS);
@@ -156,8 +219,19 @@ export async function fetchFearGreed(): Promise<FearGreedResult> {
     throw new Error('Failed to fetch fear/greed');
   }
   const payload = await response.json() as {
+  let payload: {
     data?: { value?: number | string; value_classification?: string; timestamp?: string; updated_at?: string };
   };
+  try {
+    payload = await fetchJsonWithTimeout(`${NEWS_BASE_URL}/market/fear-greed`);
+  } catch {
+    const fallbackUrl = getFallbackUrl('/market/fear-greed');
+    if (!fallbackUrl) {
+      throw new ExternalProviderError('Failed to fetch fear/greed');
+    }
+    payload = await fetchJsonWithTimeout(fallbackUrl);
+  }
+
   const data = payload.data ?? {};
   const classification = typeof data.value_classification === 'string' ? data.value_classification : 'Neutral';
   const { label, classification_en } = normalizeClassification(classification);

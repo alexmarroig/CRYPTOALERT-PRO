@@ -5,11 +5,13 @@ import { createApp } from './app.js';
 import { evaluateDegradation, getAlerts } from './observability/degradation.js';
 
 await startTelemetry();
+import { startPortfolioSyncScheduler } from './services/portfolioScheduler.js';
 
 const app = createApp();
 
 const server = app.listen(Number(env.PORT), () => {
   logger.info('Server started', { port: env.PORT });
+  startPortfolioSyncScheduler();
 });
 
 setInterval(() => {

@@ -1,0 +1,43 @@
+name: Staging Journey Monitoring
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+
+jobs:
+  run-synthetic-journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run synthetic journeys against staging
+        env:
+          STAGING_BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          DEV_SEED_KEY: ${{ secrets.DEV_SEED_KEY }}
+        run: npm run journeys:staging
+
+      - name: Enforce KPI thresholds
+        run: npm run journeys:gate
+
+      - name: Upload journey artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-journey-report
+          path: artifacts/journeys/*
+          retention-days: 14
