@@ -4,6 +4,8 @@ import { v1Routes } from './routes/v1/index.js';
 import { apiRateLimit } from './middleware/rateLimit.js';
 import { auditLogger } from './middleware/audit.js';
 import { logger } from './utils/logger.js';
+import { createRouteMetricMiddleware } from './observability/metrics.js';
+import { createTraceMiddleware } from './observability/telemetry.js';
 
 export function createApp() {
   const app = express();
@@ -22,8 +24,10 @@ export function createApp() {
     return jsonParser(req, res, next);
   });
 
+  app.use(createTraceMiddleware());
   app.use(apiRateLimit);
   app.use(auditLogger);
+  app.use(createRouteMetricMiddleware());
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });

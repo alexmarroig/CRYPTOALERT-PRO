@@ -1,4 +1,5 @@
 import { LruCache } from '../utils/lruCache.js';
+import { instrumentDependency } from '../observability/telemetry.js';
 
 type NewsItem = {
   id: string;
@@ -115,7 +116,7 @@ export async function fetchNews({
     url.searchParams.set('lang', lang);
   }
 
-  const response = await fetch(url.toString());
+  const response = await instrumentDependency('news_provider', query ? 'search' : 'news', () => fetch(url.toString()));
   if (!response.ok) {
     throw new Error('Failed to fetch news');
   }
@@ -133,7 +134,7 @@ export async function fetchNewsCategories(): Promise<{ categories: string[]; cac
     return { categories: cached, cached: true };
   }
 
-  const response = await fetch(`${NEWS_BASE_URL}/news/categories`);
+  const response = await instrumentDependency('news_provider', 'categories', () => fetch(`${NEWS_BASE_URL}/news/categories`));
   if (!response.ok) {
     throw new Error('Failed to fetch categories');
   }
@@ -150,7 +151,7 @@ export async function fetchFearGreed(): Promise<FearGreedResult> {
     return { ...cached, cached: true };
   }
 
-  const response = await fetch(`${NEWS_BASE_URL}/market/fear-greed`);
+  const response = await instrumentDependency('news_provider', 'fear_greed', () => fetch(`${NEWS_BASE_URL}/market/fear-greed`));
   if (!response.ok) {
     throw new Error('Failed to fetch fear/greed');
   }
