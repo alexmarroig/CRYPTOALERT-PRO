@@ -103,6 +103,15 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 ## OpenAPI
 - `docs/openapi.json`
 
+
+## Qualidade e performance
+- Matriz de compatibilidade + critérios go/no-go: `docs/quality-gates.md`
+- Smoke de compatibilidade: `npm run test:compatibility`
+- Testes de carga/stress/soak (k6):
+  - `npm run perf:k6:load`
+  - `npm run perf:k6:stress`
+  - `npm run perf:k6:soak`
+
 ## Deploy
 Compatível com Railway/Render/Vercel Serverless. Garanta:
 - Secrets e ENV configurados
