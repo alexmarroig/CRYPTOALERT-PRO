@@ -7,6 +7,7 @@ import {
   ingestOpsTelemetry,
   submitIncidentFeedback
 } from '../../controllers/opsController.js';
+import { createInfluencerInvite, getIncidentsPanel, listInfluencers, listInvites, revokeInfluencerInvite } from '../../controllers/adminController.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { requireRole } from '../../middleware/roleCheck.js';
 import { invitesRateLimit } from '../../middleware/rateLimit.js';
@@ -23,3 +24,4 @@ adminRoutes.post('/ops/events', requireAuth, requireRole('admin'), createOpsEven
 adminRoutes.post('/ops/analyze', requireAuth, requireRole('admin'), analyzeOpsAnomalies);
 adminRoutes.get('/ops/incidents', requireAuth, requireRole('admin'), getOpsIncidents);
 adminRoutes.post('/ops/incidents/:id/feedback', requireAuth, requireRole('admin'), submitIncidentFeedback);
+adminRoutes.get('/incidents', requireAuth, requireRole('admin'), getIncidentsPanel);

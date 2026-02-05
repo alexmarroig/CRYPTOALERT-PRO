@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../config/supabase.js';
 import { createInvite, revokeInvite } from '../services/inviteService.js';
 import { logger } from '../utils/logger.js';
+import { buildIncidentPanel } from '../services/incidentService.js';
 
 const inviteSchema = z.object({
   email: z.string().email()
@@ -66,4 +67,25 @@ export async function listInfluencers(_req: Request, res: Response) {
   }
 
   return res.json({ influencers: data });
+}
+
+
+export async function getIncidentsPanel(req: Request, res: Response) {
+  const limitParam = Number(req.query.limit ?? 20);
+  const limit = Number.isFinite(limitParam) ? Math.min(Math.max(limitParam, 1), 100) : 20;
+
+  try {
+    const incidents = await buildIncidentPanel(limit);
+
+    return res.json({
+      incidents,
+      summary: {
+        total_clusters: incidents.length,
+        total_occurrences: incidents.reduce((acc, item) => acc + item.frequencia, 0)
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Falha ao carregar painel de incidentes';
+    return res.status(500).json({ error: message });
+  }
 }
