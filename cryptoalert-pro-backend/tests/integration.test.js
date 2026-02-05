@@ -63,6 +63,11 @@ class QueryBuilder {
     return this;
   }
 
+  lte(field, value) {
+    this.filters.push((row) => row[field] <= value);
+    return this;
+  }
+
   not(field, operator, value) {
     if (operator === 'is' && value === null) {
       this.filters.push((row) => row[field] !== null && row[field] !== undefined);
@@ -229,6 +234,10 @@ const state = {
   posts: [],
   portfolios_snapshot: [],
   portfolio_visibility: [],
+  ops_telemetry: [],
+  ops_events: [],
+  ops_incidents: [],
+  ops_incident_feedback: []
   portfolios_history: [],
   portfolio_ledger: [],
   portfolio_goals_alerts: [],
@@ -252,6 +261,10 @@ beforeEach(async () => {
   state.posts = [];
   state.portfolios_snapshot = [];
   state.portfolio_visibility = [];
+  state.ops_telemetry = [];
+  state.ops_events = [];
+  state.ops_incidents = [];
+  state.ops_incident_feedback = [];
   state.portfolios_history = [];
   state.portfolio_ledger = [];
   state.portfolio_goals_alerts = [];
@@ -506,6 +519,71 @@ test('news proxy returns normalized items', async () => {
 });
 
 
+test('admin ops anomaly pipeline creates incident and feedback', async () => {
+  const app = await loadApp();
+  const token = 'admin-token';
+
+  const start = Date.now() - (30 * 60 * 1000);
+  for (let i = 0; i < 14; i += 1) {
+    await request(app)
+      .post('/v1/admin/ops/telemetry')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        metric_type: 'http_5xx_rate',
+        service_name: 'api-gateway',
+        provider: 'news-provider',
+        value: i < 13 ? 0.01 : 0.09,
+        sample_size: 1000,
+        metadata: { endpoint: '/v1/news' },
+        recorded_at: new Date(start + i * 60_000).toISOString()
+      })
+      .expect(201);
+  }
+
+  await request(app)
+    .post('/v1/admin/ops/events')
+    .set('Authorization', `Bearer ${token}`)
+    .send({
+      event_type: 'deploy',
+      service_name: 'api-gateway',
+      summary: 'Deploy release 2026.02.05',
+      occurred_at: new Date(start + 13 * 60_000).toISOString()
+    })
+    .expect(201);
+
+  const analyzeResponse = await request(app)
+    .post('/v1/admin/ops/analyze')
+    .set('Authorization', `Bearer ${token}`)
+    .send({ service_name: 'api-gateway', lookback_minutes: 60 })
+    .expect(201);
+
+  assert.equal(analyzeResponse.body.incidents.length, 1);
+  const incident = analyzeResponse.body.incidents[0];
+  assert.equal(incident.signal, 'explosion_5xx');
+  assert.equal(incident.recommendations.length >= 1, true);
+
+  const incidentsResponse = await request(app)
+    .get('/v1/admin/ops/incidents')
+    .set('Authorization', `Bearer ${token}`)
+    .query({ service_name: 'api-gateway' })
+    .expect(200);
+
+  assert.equal(incidentsResponse.body.incidents.length, 1);
+
+  await request(app)
+    .post(`/v1/admin/ops/incidents/${incident.id}/feedback`)
+    .set('Authorization', `Bearer ${token}`)
+    .send({ verdict: 'false_positive', notes: 'Noise after deploy window' })
+    .expect(201);
+
+  const filtered = await request(app)
+    .get('/v1/admin/ops/incidents')
+    .set('Authorization', `Bearer ${token}`)
+    .query({ service_name: 'api-gateway', status: 'false_positive' })
+    .expect(200);
+
+  assert.equal(filtered.body.incidents.length, 1);
+  assert.equal(filtered.body.incidents[0].status, 'false_positive');
 test('portfolio performance endpoint returns ranged series', async () => {
   const now = new Date();
   const d1 = new Date(now);
