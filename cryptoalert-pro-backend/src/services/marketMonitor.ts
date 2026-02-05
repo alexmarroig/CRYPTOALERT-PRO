@@ -7,7 +7,7 @@ const exchange = new ccxt.binance();
 export async function checkRSI(symbol: string = 'BTC/USDT') {
   try {
     const ohlcv = await exchange.fetchOHLCV(symbol, '5m', undefined, 100);
-    const closes = ohlcv.map((tick) => tick[4] as number);
+    const closes = ohlcv.map((tick: number[]) => tick[4] as number);
 
     const rsi = calculateRSI(closes);
 
@@ -27,9 +27,9 @@ export async function checkRSI(symbol: string = 'BTC/USDT') {
 export async function checkVolumeSpike(symbol: string = 'BTC/USDT') {
   try {
     const ohlcv = await exchange.fetchOHLCV(symbol, '5m', undefined, 24);
-    const volumes = ohlcv.map((tick) => tick[5] as number);
+    const volumes = ohlcv.map((tick: number[]) => tick[5] as number);
     const lastVolume = volumes[volumes.length - 1];
-    const avgVolume = volumes.slice(0, -1).reduce((a, b) => a + b, 0) / (volumes.length - 1);
+    const avgVolume = volumes.slice(0, -1).reduce((a: number, b: number) => a + b, 0) / (volumes.length - 1);
 
     if (lastVolume > avgVolume * 3) {
       const title = `📈 Volume Spike: ${symbol}`;

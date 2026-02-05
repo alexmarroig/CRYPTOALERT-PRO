@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase.js';
+import { supabaseAdmin } from '../config/supabase.js';
 
 export type SubscriptionTier = 'free' | 'pro' | 'vip';
 
@@ -7,9 +7,9 @@ export async function getSubscriptionTier(userId?: string | null): Promise<Subsc
     return 'free';
   }
 
-  const { data, error } = await supabase
-    .from('users')
-    .select('subscription_tier')
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('plan')
     .eq('id', userId)
     .single();
 
@@ -17,5 +17,5 @@ export async function getSubscriptionTier(userId?: string | null): Promise<Subsc
     return 'free';
   }
 
-  return (data?.subscription_tier as SubscriptionTier) ?? 'free';
+  return (data?.plan as SubscriptionTier) ?? 'free';
 }
