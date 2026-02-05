@@ -228,7 +228,11 @@ const state = {
   alerts: [],
   posts: [],
   portfolios_snapshot: [],
-  portfolio_visibility: []
+  portfolio_visibility: [],
+  portfolios_history: [],
+  portfolio_ledger: [],
+  portfolio_goals_alerts: [],
+  exchange_connections: []
 };
 
 const authUsers = new Map();
@@ -248,6 +252,10 @@ beforeEach(async () => {
   state.posts = [];
   state.portfolios_snapshot = [];
   state.portfolio_visibility = [];
+  state.portfolios_history = [];
+  state.portfolio_ledger = [];
+  state.portfolio_goals_alerts = [];
+  state.exchange_connections = [];
 
   authUsers.clear();
   authUsers.set('admin-token', { id: '11111111-1111-1111-1111-111111111111', email: 'admin@example.com' });
@@ -400,6 +408,85 @@ test('portfolio visibility rules are enforced', async () => {
   assert.equal(friendsResponse.status, 200);
 });
 
+
+
+test('GET /v1/news/categories success', async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ categories: ['bitcoin', 'defi'] })
+  });
+
+  const app = await loadApp();
+  const response = await request(app).get('/v1/news/categories');
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.categories, ['bitcoin', 'defi']);
+  assert.equal(response.body.meta.cached, false);
+});
+
+test('GET /v1/market/fear-greed success', async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      data: {
+        value: 72,
+        value_classification: 'Greed',
+        updated_at: '2024-01-03T00:00:00.000Z'
+      }
+    })
+  });
+
+  const app = await loadApp();
+  const response = await request(app).get('/v1/market/fear-greed');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.value, 72);
+  assert.equal(response.body.classification_en, 'Greed');
+  assert.equal(response.body.meta.cached, false);
+});
+
+test('news provider failure returns 502 with standardized payload', async () => {
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 503,
+    json: async () => ({})
+  });
+
+  const app = await loadApp();
+  const response = await request(app).get('/v1/news?limit=2');
+
+  assert.equal(response.status, 502);
+  assert.equal(response.body.error.code, 'EXTERNAL_PROVIDER_UNAVAILABLE');
+  assert.equal(response.body.error.message, 'Falha ao consultar notícias externas');
+});
+
+test('news endpoint serves cached response when provider fails', async () => {
+  let shouldFail = false;
+  globalThis.fetch = async () => {
+    if (shouldFail) {
+      throw new Error('network down');
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        items: [
+          { id: 'cached-news-1', title: 'ETH dispara', source: 'News', url: 'https://example.com/cache', published_at: '2024-01-02', assets: ['ETH'] }
+        ]
+      })
+    };
+  };
+
+  const app = await loadApp();
+  const first = await request(app).get('/v1/news?limit=1&category=cache-test');
+  assert.equal(first.status, 200);
+  assert.equal(first.body.meta.cached, false);
+
+  shouldFail = true;
+  const second = await request(app).get('/v1/news?limit=1&category=cache-test');
+  assert.equal(second.status, 200);
+  assert.equal(second.body.meta.cached, true);
+  assert.equal(second.body.items[0].id, 'cached-news-1');
+});
 test('news proxy returns normalized items', async () => {
   globalThis.fetch = async () => ({
     ok: true,
@@ -416,4 +503,122 @@ test('news proxy returns normalized items', async () => {
   assert.equal(response.status, 200);
   assert.equal(response.body.items.length, 1);
   assert.equal(response.body.items[0].id, 'news-1');
+});
+
+
+test('portfolio performance endpoint returns ranged series', async () => {
+  const now = new Date();
+  const d1 = new Date(now);
+  const d2 = new Date(now);
+  const d3 = new Date(now);
+  d1.setDate(now.getDate() - 10);
+  d2.setDate(now.getDate() - 5);
+  d3.setDate(now.getDate() - 1);
+
+  state.portfolios_history.push(
+    { user_id: '33333333-3333-3333-3333-333333333333', total_value: 1000, created_at: d1.toISOString() },
+    { user_id: '33333333-3333-3333-3333-333333333333', total_value: 1200, created_at: d2.toISOString() },
+    { user_id: '33333333-3333-3333-3333-333333333333', total_value: 1100, created_at: d3.toISOString() }
+  );
+
+  const app = await loadApp();
+  const response = await request(app)
+    .get('/v1/portfolio/performance?range=1y')
+    .set('Authorization', 'Bearer user-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.range, '1y');
+  assert.equal(response.body.points.length, 3);
+  assert.equal(Math.round(response.body.performance_pct), 10);
+});
+
+test('portfolio composition endpoint returns concentration and exchange exposure', async () => {
+  state.portfolios_snapshot.push({
+    id: 'snapshot-1',
+    user_id: '33333333-3333-3333-3333-333333333333',
+    total_value: 2000,
+    assets: [
+      { symbol: 'BTC', qty: 0.02, value: 1200, exchange: 'binance' },
+      { symbol: 'ETH', qty: 0.5, value: 700, exchange: 'okx' },
+      { symbol: 'USDT', qty: 100, value: 100, exchange: 'binance' }
+    ]
+  });
+
+  const app = await loadApp();
+  const response = await request(app)
+    .get('/v1/portfolio/composition')
+    .set('Authorization', 'Bearer user-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.top_holdings[0].symbol, 'BTC');
+  assert.equal(response.body.exposure_by_exchange[0].exchange, 'binance');
+  assert.equal(response.body.composition_by_class.length, 2);
+});
+
+test('portfolio goals and alerts endpoint supports upsert and read', async () => {
+  const app = await loadApp();
+
+  const update = await request(app)
+    .put('/v1/portfolio/goals-alerts')
+    .set('Authorization', 'Bearer user-token')
+    .send({ maxDrawdownPct: 15, targetNetWorth: 100000, assetDailyChangePct: 8 });
+
+  assert.equal(update.status, 200);
+  assert.equal(update.body.goals_alerts.max_drawdown_pct, 15);
+
+  const read = await request(app)
+    .get('/v1/portfolio/goals-alerts')
+    .set('Authorization', 'Bearer user-token');
+
+  assert.equal(read.status, 200);
+  assert.equal(read.body.goals_alerts.target_net_worth, 100000);
+});
+
+test('portfolio reconciliation consolidates holdings and pnl', async () => {
+  state.portfolio_ledger.push(
+    {
+      user_id: '33333333-3333-3333-3333-333333333333',
+      exchange: 'binance',
+      asset: 'BTC',
+      type: 'trade',
+      quantity: 2,
+      price: 100,
+      executed_at: '2024-01-01T00:00:00.000Z'
+    },
+    {
+      user_id: '33333333-3333-3333-3333-333333333333',
+      exchange: 'binance',
+      asset: 'BTC',
+      type: 'trade',
+      quantity: -1,
+      price: 150,
+      executed_at: '2024-01-02T00:00:00.000Z'
+    },
+    {
+      user_id: '33333333-3333-3333-3333-333333333333',
+      exchange: 'binance',
+      asset: 'BTC',
+      type: 'fee',
+      quantity: 0.1,
+      price: 10,
+      executed_at: '2024-01-03T00:00:00.000Z'
+    }
+  );
+
+  state.portfolios_snapshot.push({
+    id: 'snapshot-2',
+    user_id: '33333333-3333-3333-3333-333333333333',
+    assets: [{ symbol: 'BTC', qty: 1, value: 160 }]
+  });
+
+  const app = await loadApp();
+  const response = await request(app)
+    .get('/v1/portfolio/reconciliation')
+    .set('Authorization', 'Bearer user-token');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.holdings.length, 1);
+  assert.equal(response.body.holdings[0].asset, 'BTC');
+  assert.equal(Math.round(response.body.totals.realizedPnl), 49);
+  assert.equal(Math.round(response.body.totals.unrealizedPnl), 60);
 });

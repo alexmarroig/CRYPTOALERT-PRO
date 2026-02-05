@@ -2,6 +2,7 @@ declare global {
   namespace Express {
     interface Request {
       authToken?: string;
+      traceId?: string;
       user?: {
         id: string;
         email: string;
