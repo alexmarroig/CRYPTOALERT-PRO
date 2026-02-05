@@ -378,7 +378,51 @@
         ],
         "responses": {
           "200": {
-            "description": "Lista de notícias normalizadas"
+            "description": "Lista de notícias normalizadas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "cached"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha do provider externo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalProviderError"
+                }
+              }
+            }
           }
         }
       }
@@ -388,7 +432,51 @@
         "summary": "Lista categorias de notícias",
         "responses": {
           "200": {
-            "description": "Categorias de notícias"
+            "description": "Categorias de notícias",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "cached"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "categories",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha do provider externo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalProviderError"
+                }
+              }
+            }
           }
         }
       }
@@ -398,7 +486,61 @@
         "summary": "Índice de medo e ganância (proxy)",
         "responses": {
           "200": {
-            "description": "Índice Fear & Greed"
+            "description": "Índice Fear & Greed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "classification_en": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "provider": {
+                          "type": "string"
+                        },
+                        "cached": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "provider",
+                        "cached"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "value",
+                    "label",
+                    "classification_en",
+                    "updated_at",
+                    "meta"
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Falha do provider externo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalProviderError"
+                }
+              }
+            }
           }
         }
       }
@@ -464,6 +606,42 @@
             "description": "Seed executado"
           }
         }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ExternalProviderError": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "integer",
+            "example": 502
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "EXTERNAL_PROVIDER_UNAVAILABLE",
+                  "EXTERNAL_PROVIDER_TIMEOUT"
+                ]
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "error"
+        ]
       }
     }
   }
