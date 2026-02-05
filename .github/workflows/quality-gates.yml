@@ -1,0 +1,61 @@
+name: Quality Gates
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  push:
+    branches:
+      - release-candidate
+      - 'release/**'
+  workflow_dispatch:
+    inputs:
+      performance_profile:
+        description: 'Profile de performance (load|stress|soak)'
+        required: true
+        default: 'load'
+
+jobs:
+  compatibility:
+    name: Compatibility Matrix (OS)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        working-directory: cryptoalert-pro-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: cryptoalert-pro-backend/package-lock.json
+      - run: npm ci
+      - name: Validate compatibility matrix + API smoke
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          AUTH_TOKEN: ${{ secrets.STAGING_AUTH_TOKEN }}
+        run: npm run test:compatibility
+
+  performance:
+    name: k6 performance (${{ github.event.inputs.performance_profile || 'load' }})
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cryptoalert-pro-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - name: Run k6 tests
+        env:
+          BASE_URL: ${{ secrets.STAGING_BASE_URL }}
+          AUTH_TOKEN: ${{ secrets.STAGING_AUTH_TOKEN }}
+          TEST_PROFILE: ${{ github.event.inputs.performance_profile || 'load' }}
+        run: |
+          if [ -z "$BASE_URL" ]; then
+            echo "STAGING_BASE_URL secret not configured" >&2
+            exit 1
+          fi
+          npm run perf:k6
