@@ -1,4 +1,17 @@
 import winston from 'winston';
+import { getTraceContext } from '../observability/telemetry.js';
+
+const traceCorrelationFormat = winston.format((info) => {
+  const trace = getTraceContext();
+  if (trace) {
+    info.trace_id = trace.traceId;
+    info.span_id = trace.spanId;
+    if (trace.parentSpanId) {
+      info.parent_span_id = trace.parentSpanId;
+    }
+  }
+  return info;
+});
 import type { Request } from 'express';
 
 interface StructuredErrorLog {
@@ -13,6 +26,7 @@ interface StructuredErrorLog {
 export const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
+    traceCorrelationFormat(),
     winston.format.timestamp(),
     winston.format.json()
   ),

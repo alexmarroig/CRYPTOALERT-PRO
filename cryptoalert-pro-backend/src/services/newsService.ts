@@ -1,4 +1,5 @@
 import { LruCache } from '../utils/lruCache.js';
+import { instrumentDependency } from '../observability/telemetry.js';
 
 type NewsItem = {
   id: string;
@@ -155,6 +156,9 @@ export async function fetchNews({
     url.searchParams.set('lang', lang);
   }
 
+  const response = await instrumentDependency('news_provider', query ? 'search' : 'news', () => fetch(url.toString()));
+  if (!response.ok) {
+    throw new Error('Failed to fetch news');
   let payload: { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] };
   try {
     payload = await fetchJsonWithTimeout(url.toString());
@@ -184,6 +188,9 @@ export async function fetchNewsCategories(): Promise<{ categories: string[]; cac
     return { categories: cached, cached: true };
   }
 
+  const response = await instrumentDependency('news_provider', 'categories', () => fetch(`${NEWS_BASE_URL}/news/categories`));
+  if (!response.ok) {
+    throw new Error('Failed to fetch categories');
   let payload: { data?: string[]; categories?: string[] };
   try {
     payload = await fetchJsonWithTimeout(`${NEWS_BASE_URL}/news/categories`);
@@ -207,6 +214,11 @@ export async function fetchFearGreed(): Promise<FearGreedResult> {
     return { ...cached, cached: true };
   }
 
+  const response = await instrumentDependency('news_provider', 'fear_greed', () => fetch(`${NEWS_BASE_URL}/market/fear-greed`));
+  if (!response.ok) {
+    throw new Error('Failed to fetch fear/greed');
+  }
+  const payload = await response.json() as {
   let payload: {
     data?: { value?: number | string; value_classification?: string; timestamp?: string; updated_at?: string };
   };
