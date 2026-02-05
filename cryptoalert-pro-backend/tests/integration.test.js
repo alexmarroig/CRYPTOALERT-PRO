@@ -400,6 +400,85 @@ test('portfolio visibility rules are enforced', async () => {
   assert.equal(friendsResponse.status, 200);
 });
 
+
+
+test('GET /v1/news/categories success', async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ categories: ['bitcoin', 'defi'] })
+  });
+
+  const app = await loadApp();
+  const response = await request(app).get('/v1/news/categories');
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(response.body.categories, ['bitcoin', 'defi']);
+  assert.equal(response.body.meta.cached, false);
+});
+
+test('GET /v1/market/fear-greed success', async () => {
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      data: {
+        value: 72,
+        value_classification: 'Greed',
+        updated_at: '2024-01-03T00:00:00.000Z'
+      }
+    })
+  });
+
+  const app = await loadApp();
+  const response = await request(app).get('/v1/market/fear-greed');
+
+  assert.equal(response.status, 200);
+  assert.equal(response.body.value, 72);
+  assert.equal(response.body.classification_en, 'Greed');
+  assert.equal(response.body.meta.cached, false);
+});
+
+test('news provider failure returns 502 with standardized payload', async () => {
+  globalThis.fetch = async () => ({
+    ok: false,
+    status: 503,
+    json: async () => ({})
+  });
+
+  const app = await loadApp();
+  const response = await request(app).get('/v1/news?limit=2');
+
+  assert.equal(response.status, 502);
+  assert.equal(response.body.error.code, 'EXTERNAL_PROVIDER_UNAVAILABLE');
+  assert.equal(response.body.error.message, 'Falha ao consultar notícias externas');
+});
+
+test('news endpoint serves cached response when provider fails', async () => {
+  let shouldFail = false;
+  globalThis.fetch = async () => {
+    if (shouldFail) {
+      throw new Error('network down');
+    }
+    return {
+      ok: true,
+      json: async () => ({
+        items: [
+          { id: 'cached-news-1', title: 'ETH dispara', source: 'News', url: 'https://example.com/cache', published_at: '2024-01-02', assets: ['ETH'] }
+        ]
+      })
+    };
+  };
+
+  const app = await loadApp();
+  const first = await request(app).get('/v1/news?limit=1&category=cache-test');
+  assert.equal(first.status, 200);
+  assert.equal(first.body.meta.cached, false);
+
+  shouldFail = true;
+  const second = await request(app).get('/v1/news?limit=1&category=cache-test');
+  assert.equal(second.status, 200);
+  assert.equal(second.body.meta.cached, true);
+  assert.equal(second.body.items[0].id, 'cached-news-1');
+});
 test('news proxy returns normalized items', async () => {
   globalThis.fetch = async () => ({
     ok: true,
