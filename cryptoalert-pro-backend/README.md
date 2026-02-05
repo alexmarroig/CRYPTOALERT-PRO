@@ -21,6 +21,7 @@ Backend production-ready para o app **CryptoAlert Pro**, focado em **alertas e r
 - Visibilidade de portfolio: `private`, `friends`, `public`, `percent`
 - Stripe billing com planos `free`, `pro`, `vip`
 - Rate limiting, validação com Zod e logs básicos
+- Módulo de detecção de anomalias operacionais com feedback humano e recomendações de mitigação
 
 ## Estrutura
 ```
@@ -66,6 +67,13 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 - `GET /v1/admin/invites`
 - `POST /v1/admin/invites/:id/revoke`
 - `GET /v1/admin/influencers`
+
+### Ops / Anomaly Detection (admin)
+- `POST /v1/admin/ops/telemetry`
+- `POST /v1/admin/ops/events`
+- `POST /v1/admin/ops/analyze`
+- `GET /v1/admin/ops/incidents?service_name=<name>&status=<optional>`
+- `POST /v1/admin/ops/incidents/:id/feedback`
 
 ### Follow / Social
 - `POST /v1/follow`
