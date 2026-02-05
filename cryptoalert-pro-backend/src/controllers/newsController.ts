@@ -7,6 +7,7 @@ import {
   fetchNewsCategories,
   getNewsMetricsSnapshot
 } from '../services/newsService.js';
+import { ExternalProviderError, fetchFearGreed, fetchNews, fetchNewsCategories } from '../services/newsService.js';
 
 const newsQuerySchema = z.object({
   limit: z.string().optional(),
@@ -17,6 +18,26 @@ const newsQuerySchema = z.object({
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
+
+function mapExternalError(error: unknown, fallbackMessage: string) {
+  if (error instanceof ExternalProviderError) {
+    return {
+      status: 502,
+      error: {
+        code: error.code,
+        message: fallbackMessage
+      }
+    };
+  }
+
+  return {
+    status: 502,
+    error: {
+      code: 'EXTERNAL_PROVIDER_UNAVAILABLE',
+      message: fallbackMessage
+    }
+  };
+}
 
 function sanitizeText(value?: string, maxLength = 60) {
   if (!value) return undefined;
@@ -83,6 +104,8 @@ export async function getNews(req: Request, res: Response) {
   } catch (error) {
     const providerError = buildProviderError(error, 'Failed to fetch news');
     return res.status(providerError.status).json(providerError.payload);
+    const mapped = mapExternalError(error, 'Falha ao consultar notícias externas');
+    return res.status(mapped.status).json(mapped);
   }
 }
 
@@ -101,6 +124,8 @@ export async function getNewsCategories(_req: Request, res: Response) {
   } catch (error) {
     const providerError = buildProviderError(error, 'Failed to fetch categories');
     return res.status(providerError.status).json(providerError.payload);
+    const mapped = mapExternalError(error, 'Falha ao consultar categorias externas');
+    return res.status(mapped.status).json(mapped);
   }
 }
 
@@ -122,5 +147,7 @@ export async function getFearGreed(_req: Request, res: Response) {
   } catch (error) {
     const providerError = buildProviderError(error, 'Failed to fetch fear/greed');
     return res.status(providerError.status).json(providerError.payload);
+    const mapped = mapExternalError(error, 'Falha ao consultar índice fear-greed externo');
+    return res.status(mapped.status).json(mapped);
   }
 }

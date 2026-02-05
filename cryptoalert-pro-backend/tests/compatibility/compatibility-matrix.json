@@ -1,0 +1,16 @@
+{
+  "browsers": [
+    { "name": "Chrome", "version": "latest-2" },
+    { "name": "Firefox", "version": "latest-2" },
+    { "name": "Safari", "version": "latest-2" },
+    { "name": "Edge", "version": "latest-2" }
+  ],
+  "operatingSystems": ["Windows 11", "macOS Sonoma", "Ubuntu 24.04", "Android 14", "iOS 17"],
+  "devices": [
+    { "profile": "desktop", "resolution": "1920x1080" },
+    { "profile": "laptop", "resolution": "1440x900" },
+    { "profile": "tablet", "resolution": "834x1194" },
+    { "profile": "mobile", "resolution": "390x844" }
+  ],
+  "apiSmokeTargets": ["/health", "/v1/news", "/v1/alerts", "/v1/portfolio/me"]
+}
