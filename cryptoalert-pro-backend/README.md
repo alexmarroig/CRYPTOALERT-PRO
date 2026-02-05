@@ -108,6 +108,14 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 - `GET /v1/billing/status`
 - `POST /v1/billing/webhook`
 
+
+## Security no CI/CD
+- SAST com **CodeQL** em PR/push (`.github/workflows/security-ci.yml`).
+- Dependency scanning com `npm audit` + gate para vulnerabilidades críticas.
+- DAST em staging para `/v1/*` com OWASP ZAP (`.github/workflows/dast-staging.yml`).
+- Releases são bloqueadas em vulnerabilidades críticas (`.github/workflows/release-gate.yml`).
+- Política e SLA de remediação em `SECURITY.md`.
+
 ## OpenAPI
 - `docs/openapi.json`
 

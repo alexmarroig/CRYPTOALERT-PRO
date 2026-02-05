@@ -1119,3 +1119,56 @@ test('portfolio reconciliation consolidates holdings and pnl', async () => {
   assert.equal(Math.round(response.body.totals.realizedPnl), 49);
   assert.equal(Math.round(response.body.totals.unrealizedPnl), 60);
 });
+
+
+
+test('authz prevents privilege escalation for influencer-only routes', async () => {
+  const app = await loadApp();
+  const response = await request(app)
+    .post('/v1/alerts')
+    .set('Authorization', 'Bearer user-token')
+    .send({ asset: 'BTC', side: 'buy' });
+
+  assert.equal(response.status, 403);
+});
+
+test('authn rejects invalid tokens on protected endpoints', async () => {
+  const app = await loadApp();
+  const response = await request(app)
+    .get('/v1/me')
+    .set('Authorization', 'Bearer invalid-token');
+
+  assert.equal(response.status, 401);
+});
+
+test('authz prevents role bypass on admin endpoints', async () => {
+  const app = await loadApp();
+  const response = await request(app)
+    .get('/v1/admin/invites')
+    .set('Authorization', 'Bearer user-token');
+
+  assert.equal(response.status, 403);
+});
+
+test('authz blocks IDOR when updating another creator alert', async () => {
+  state.alerts.push(
+    {
+      id: 'idor-alert',
+      creator_id: '22222222-2222-2222-2222-222222222222',
+      side: 'buy',
+      asset: 'BTC',
+      status: 'active',
+      created_at: '2024-01-01'
+    }
+  );
+
+  const app = await loadApp();
+  const response = await request(app)
+    .patch('/v1/alerts/idor-alert/status')
+    .set('Authorization', 'Bearer admin-token')
+    .send({ status: 'closed' });
+
+  assert.equal(response.status, 404);
+  const row = state.alerts.find((alert) => alert.id === 'idor-alert');
+  assert.equal(row?.status, 'active');
+});

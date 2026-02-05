@@ -1,0 +1,35 @@
+name: Release Security Gate
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  block-critical-vulns:
+    name: Block release on critical vulnerabilities
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cryptoalert-pro-backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: cryptoalert-pro-backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate npm audit report
+        run: npm audit --json > npm-audit.json
+
+      - name: Fail release if critical vulnerabilities exist
+        run: node scripts/security/enforce-security-gate.mjs npm-audit.json
