@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
-import { logger } from '../utils/logger.js';
+import { buildRequestLogContext, logger } from '../utils/logger.js';
 
-const auditedMethods = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
+const auditedMethods = new Set(['POST', 'PATCH', 'PUT', 'DELETE', 'GET']);
 
 export function auditLogger(req: Request, res: Response, next: NextFunction) {
   if (!auditedMethods.has(req.method)) {
@@ -10,11 +10,11 @@ export function auditLogger(req: Request, res: Response, next: NextFunction) {
 
   const startedAt = Date.now();
   res.on('finish', () => {
-    logger.info('audit', {
-      method: req.method,
-      path: req.originalUrl,
+    const context = buildRequestLogContext(req);
+    logger.info('request.completed', {
+      ...context,
       status: res.statusCode,
-      user_id: req.user?.id ?? null,
+      erro: null,
       duration_ms: Date.now() - startedAt
     });
   });

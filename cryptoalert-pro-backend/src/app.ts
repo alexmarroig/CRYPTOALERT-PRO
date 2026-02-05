@@ -3,11 +3,15 @@ import cors from 'cors';
 import { v1Routes } from './routes/v1/index.js';
 import { apiRateLimit } from './middleware/rateLimit.js';
 import { auditLogger } from './middleware/audit.js';
-import { logger } from './utils/logger.js';
+import { buildRequestLogContext, logStructuredError } from './utils/logger.js';
+import { requestContext } from './middleware/requestContext.js';
+import { classifyFailureType } from './services/incidentService.js';
 
 export function createApp() {
   const app = express();
   const jsonParser = express.json();
+
+  app.use(requestContext);
 
   app.use(cors({
     origin: process.env.FRONTEND_URL ?? 'https://cryptoalert.pro',
@@ -31,9 +35,17 @@ export function createApp() {
 
   app.use('/v1', v1Routes);
 
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logger.error('Unhandled error', { message: err.message });
-    res.status(500).json({ error: 'Internal server error' });
+  app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const context = buildRequestLogContext(req);
+    const status = res.statusCode >= 400 ? res.statusCode : 500;
+    logStructuredError({
+      ...context,
+      status,
+      erro: err.message,
+      failure_type: classifyFailureType(err.message, req.originalUrl, status)
+    });
+
+    res.status(500).json({ error: 'Internal server error', trace_id: req.traceId ?? null });
   });
 
   return app;
