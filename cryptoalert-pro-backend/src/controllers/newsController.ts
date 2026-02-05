@@ -1,5 +1,12 @@
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import {
+  ExternalProviderError,
+  fetchFearGreed,
+  fetchNews,
+  fetchNewsCategories,
+  getNewsMetricsSnapshot
+} from '../services/newsService.js';
 import { ExternalProviderError, fetchFearGreed, fetchNews, fetchNewsCategories } from '../services/newsService.js';
 
 const newsQuerySchema = z.object({
@@ -45,6 +52,28 @@ function parseLimit(value?: string) {
   return Math.min(Math.max(Math.trunc(parsed), 1), MAX_LIMIT);
 }
 
+function buildProviderError(error: unknown, fallbackMessage: string) {
+  if (error instanceof ExternalProviderError) {
+    return {
+      status: 502,
+      payload: {
+        error_code: error.errorCode,
+        message: error.message,
+        retryable: error.retryable
+      }
+    };
+  }
+
+  return {
+    status: 502,
+    payload: {
+      error_code: 'UPSTREAM_UNAVAILABLE',
+      message: fallbackMessage,
+      retryable: true
+    }
+  };
+}
+
 export async function getNews(req: Request, res: Response) {
   const parse = newsQuerySchema.safeParse(req.query);
   if (!parse.success) {
@@ -56,7 +85,7 @@ export async function getNews(req: Request, res: Response) {
   const query = sanitizeText(parse.data.q, 80);
 
   try {
-    const { items, cached } = await fetchNews({
+    const { items, cached, degraded, provider } = await fetchNews({
       limit,
       category,
       query,
@@ -66,11 +95,15 @@ export async function getNews(req: Request, res: Response) {
     return res.json({
       items,
       meta: {
-        provider: 'free-crypto-news',
-        cached
+        provider,
+        cached,
+        degraded,
+        metrics: getNewsMetricsSnapshot()
       }
     });
   } catch (error) {
+    const providerError = buildProviderError(error, 'Failed to fetch news');
+    return res.status(providerError.status).json(providerError.payload);
     const mapped = mapExternalError(error, 'Falha ao consultar notícias externas');
     return res.status(mapped.status).json(mapped);
   }
@@ -78,21 +111,25 @@ export async function getNews(req: Request, res: Response) {
 
 export async function getNewsCategories(_req: Request, res: Response) {
   try {
-    const { categories, cached } = await fetchNewsCategories();
+    const { categories, cached, degraded, provider } = await fetchNewsCategories();
     return res.json({
       categories,
       meta: {
-        provider: 'free-crypto-news',
-        cached
+        provider,
+        cached,
+        degraded,
+        metrics: getNewsMetricsSnapshot()
       }
     });
   } catch (error) {
+    const providerError = buildProviderError(error, 'Failed to fetch categories');
+    return res.status(providerError.status).json(providerError.payload);
     const mapped = mapExternalError(error, 'Falha ao consultar categorias externas');
     return res.status(mapped.status).json(mapped);
   }
 }
 
-export async function getFearGreed(req: Request, res: Response) {
+export async function getFearGreed(_req: Request, res: Response) {
   try {
     const result = await fetchFearGreed();
     return res.json({
@@ -101,11 +138,15 @@ export async function getFearGreed(req: Request, res: Response) {
       classification_en: result.classification_en,
       updated_at: result.updated_at,
       meta: {
-        provider: 'free-crypto-news',
-        cached: result.cached
+        provider: result.provider,
+        cached: result.cached,
+        degraded: result.degraded,
+        metrics: getNewsMetricsSnapshot()
       }
     });
   } catch (error) {
+    const providerError = buildProviderError(error, 'Failed to fetch fear/greed');
+    return res.status(providerError.status).json(providerError.payload);
     const mapped = mapExternalError(error, 'Falha ao consultar índice fear-greed externo');
     return res.status(mapped.status).json(mapped);
   }

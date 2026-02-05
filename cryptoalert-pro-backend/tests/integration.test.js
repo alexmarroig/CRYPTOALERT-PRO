@@ -1,4 +1,4 @@
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import request from 'supertest';
 import crypto from 'node:crypto';
@@ -225,6 +225,9 @@ class QueryBuilder {
   }
 }
 
+
+const originalFetch = globalThis.fetch;
+
 const state = {
   profiles: [],
   admin_whitelist: [],
@@ -245,6 +248,10 @@ const state = {
 };
 
 const authUsers = new Map();
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
 
 beforeEach(async () => {
   const { supabaseAdmin } = await import('../src/config/supabase.js');
@@ -423,6 +430,69 @@ test('portfolio visibility rules are enforced', async () => {
   assert.equal(friendsResponse.status, 200);
 });
 
+test('news endpoints: success, timeout fallback and degraded mode with cache', async () => {
+  const { resetNewsServiceState } = await import('../src/services/newsService.js');
+  resetNewsServiceState();
+
+  let call = 0;
+  globalThis.fetch = async (url, options) => {
+    const target = String(url);
+    call += 1;
+
+    if (call === 1 && target.includes('/news?')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            { id: 'news-1', title: 'BTC sobe', source: 'News', url: 'https://example.com/n1', published_at: '2024-01-01', assets: ['BTC'] }
+          ]
+        })
+      };
+    }
+
+    if (call <= 2 && options?.signal) {
+      const timeoutError = new Error('timeout');
+      timeoutError.name = 'AbortError';
+      throw timeoutError;
+    }
+
+    if (target.includes('/news?')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [
+            { id: 'news-2', title: 'ETH dispara', source: 'Fallback', url: 'https://example.com/n2', published_at: '2024-01-02', assets: ['ETH'] }
+          ]
+        })
+      };
+    }
+
+    if (target.includes('/news/categories')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ categories: ['btc', 'defi'] })
+      };
+    }
+
+    if (target.includes('/market/fear-greed')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: {
+            value: 65,
+            value_classification: 'Greed',
+            updated_at: '2024-02-01T00:00:00.000Z'
+          }
+        })
+      };
+    }
+
+    return { ok: false, status: 503, json: async () => ({}) };
+  };
 
 
 test('GET /v1/news/categories success', async () => {
@@ -513,11 +583,54 @@ test('news proxy returns normalized items', async () => {
   });
 
   const app = await loadApp();
-  const response = await request(app).get('/v1/news?limit=1&lang=pt');
 
-  assert.equal(response.status, 200);
-  assert.equal(response.body.items.length, 1);
-  assert.equal(response.body.items[0].id, 'news-1');
+  const newsResponse = await request(app).get('/v1/news?limit=1&lang=pt');
+  assert.equal(newsResponse.status, 200);
+  assert.equal(newsResponse.body.items[0].id, 'news-1');
+  assert.equal(newsResponse.body.meta.degraded, false);
+
+  const categoriesResponse = await request(app).get('/v1/news/categories');
+  assert.equal(categoriesResponse.status, 200);
+  assert.deepEqual(categoriesResponse.body.categories, ['btc', 'defi']);
+
+  const fearGreedResponse = await request(app).get('/v1/market/fear-greed');
+  assert.equal(fearGreedResponse.status, 200);
+  assert.equal(fearGreedResponse.body.value, 65);
+  assert.equal(typeof fearGreedResponse.body.meta.metrics.cache.hit_ratio, 'number');
+
+  globalThis.fetch = async (_url, options) => {
+    const timeoutError = new Error('timeout');
+    timeoutError.name = options?.signal ? 'AbortError' : 'Error';
+    throw timeoutError;
+  };
+
+  const realDateNow = Date.now;
+  Date.now = () => realDateNow() + 61_000;
+  const degradedResponse = await request(app).get('/v1/news?limit=1&lang=pt');
+  Date.now = realDateNow;
+
+  assert.equal(degradedResponse.status, 200);
+  assert.equal(degradedResponse.body.meta.degraded, true);
+  assert.equal(degradedResponse.body.meta.provider, 'stale-cache');
+});
+
+test('news endpoints return consistent error contract when no fallback cache exists', async () => {
+  const { resetNewsServiceState } = await import('../src/services/newsService.js');
+  resetNewsServiceState();
+
+  globalThis.fetch = async (_url, options) => {
+    const timeoutError = new Error('timeout');
+    timeoutError.name = options?.signal ? 'AbortError' : 'Error';
+    throw timeoutError;
+  };
+
+  const app = await loadApp();
+  const response = await request(app).get('/v1/news?limit=3&lang=en');
+
+  assert.equal(response.status, 502);
+  assert.equal(response.body.error_code, 'UPSTREAM_TIMEOUT');
+  assert.equal(typeof response.body.message, 'string');
+  assert.equal(response.body.retryable, true);
 });
 
 test('incident-risk pipeline ingests telemetry, runs ETL, trains and infers', async () => {
