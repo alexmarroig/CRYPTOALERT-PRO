@@ -1,3 +1,4 @@
+import { AppError } from '../errors/AppError.js';
 import { LruCache } from '../utils/lruCache.js';
 import { instrumentDependency } from '../observability/telemetry.js';
 
@@ -25,6 +26,7 @@ type NewsItem = {
 type NewsResult = {
   items: NewsItem[];
   cached: boolean;
+  fallback: boolean;
   degraded: boolean;
   provider: string;
 };
@@ -35,6 +37,7 @@ type FearGreedResult = {
   classification_en: 'Fear' | 'Neutral' | 'Greed';
   updated_at: string;
   cached: boolean;
+  fallback: boolean;
   degraded: boolean;
   provider: string;
 };
@@ -56,6 +59,7 @@ const NEWS_BASE_URL = 'https://news-crypto.vercel.app/api';
 const NEWS_FALLBACK_BASE_URL = process.env.NEWS_FALLBACK_BASE_URL;
 const newsCache = new LruCache<NewsItem[]>(100);
 const categoriesCache = new LruCache<string[]>(5);
+const fearGreedCache = new LruCache<Omit<FearGreedResult, 'cached' | 'fallback'>>(5);
 const fearGreedCache = new LruCache<Omit<FearGreedResult, 'cached' | 'degraded' | 'provider'>>(5);
 const staleNewsCache = new Map<string, NewsItem[]>();
 const staleCategoriesCache = new Map<string, string[]>();
@@ -258,6 +262,7 @@ function normalizeNewsItem(item: Record<string, unknown>, index: number): NewsIt
       ? item.publishedAt
       : new Date().toISOString();
 
+  // External providers send inconsistent schemas; normalize aliases into one stable API contract.
   return {
     id,
     title: typeof item.title === 'string' ? item.title : 'Notícia',
@@ -284,7 +289,7 @@ function normalizeClassification(classification: string): { label: 'Medo' | 'Neu
   return { label: 'Neutro', classification_en: 'Neutral' as const };
 }
 
-export async function fetchNews({
+export async function getNewsFeed({
   limit,
   category,
   query,
@@ -299,6 +304,7 @@ export async function fetchNews({
   const cached = newsCache.get(key);
   recordCacheHit(Boolean(cached));
   if (cached) {
+    return { items: cached, cached: true, fallback: false };
     return { items: cached, cached: true, degraded: false, provider: 'cache' };
   }
 
@@ -316,6 +322,22 @@ export async function fetchNews({
   }
 
   try {
+    const response = await fetch(url.toString());
+    if (!response.ok) {
+      throw new AppError('Failed to fetch news', 502, { code: 'NEWS_PROVIDER_FAILED' });
+    }
+    const payload = await response.json() as { data?: Record<string, unknown>[]; items?: Record<string, unknown>[] };
+    const rawItems = payload.items ?? payload.data ?? [];
+    const items = rawItems.map((item, index) => normalizeNewsItem(item, index));
+
+    newsCache.set(key, items, NEWS_TTL_MS);
+    return { items, cached: false, fallback: false };
+  } catch {
+    return { items: cached ?? [], cached: Boolean(cached), fallback: true };
+  }
+}
+
+export async function getNewsCategoriesList(): Promise<{ categories: string[]; cached: boolean; fallback: boolean }> {
     const endpoint = query ? '/search' : '/news';
     const { payload, provider } = await fetchWithFallback<{ data?: Record<string, unknown>[]; items?: Record<string, unknown>[] }>(endpoint, params);
     const rawItems = payload.items ?? payload.data ?? [];
@@ -358,6 +380,21 @@ export async function fetchNewsCategories(): Promise<{ categories: string[]; cac
   const cached = categoriesCache.get('categories');
   recordCacheHit(Boolean(cached));
   if (cached) {
+    return { categories: cached, cached: true, fallback: false };
+  }
+
+  try {
+    const response = await fetch(`${NEWS_BASE_URL}/news/categories`);
+    if (!response.ok) {
+      throw new AppError('Failed to fetch categories', 502, { code: 'NEWS_CATEGORIES_PROVIDER_FAILED' });
+    }
+    const payload = await response.json() as { data?: string[]; categories?: string[] };
+    const categories = payload.categories ?? payload.data ?? [];
+
+    categoriesCache.set('categories', categories, CATEGORIES_TTL_MS);
+    return { categories, cached: false, fallback: false };
+  } catch {
+    return { categories: cached ?? [], cached: Boolean(cached), fallback: true };
     return { categories: cached, cached: true, degraded: false, provider: 'cache' };
   }
 
@@ -392,10 +429,21 @@ export async function fetchNewsCategories(): Promise<{ categories: string[]; cac
   }
 }
 
-export async function fetchFearGreed(): Promise<FearGreedResult> {
+export async function getFearGreedIndex(): Promise<FearGreedResult> {
   const cached = fearGreedCache.get('fear-greed');
   recordCacheHit(Boolean(cached));
   if (cached) {
+    return { ...cached, cached: true, fallback: false };
+  }
+
+  try {
+    const response = await fetch(`${NEWS_BASE_URL}/market/fear-greed`);
+    if (!response.ok) {
+      throw new AppError('Failed to fetch fear/greed', 502, { code: 'FEAR_GREED_PROVIDER_FAILED' });
+    }
+    const payload = await response.json() as {
+      data?: { value?: number | string; value_classification?: string; timestamp?: string; updated_at?: string };
+    };
     return { ...cached, cached: true, degraded: false, provider: 'cache' };
   }
 
@@ -412,6 +460,27 @@ export async function fetchFearGreed(): Promise<FearGreedResult> {
       : typeof data.timestamp === 'string'
         ? new Date(Number(data.timestamp) * 1000).toISOString()
         : new Date().toISOString();
+
+    const result: Omit<FearGreedResult, 'cached' | 'fallback'> = {
+      value: Number.isFinite(value) ? value : 0,
+      label,
+      classification_en,
+      updated_at: updatedAt
+    };
+
+    fearGreedCache.set('fear-greed', result, FEAR_GREED_TTL_MS);
+    return { ...result, cached: false, fallback: false };
+  } catch {
+    const fallbackCached = fearGreedCache.get('fear-greed');
+    return {
+      value: fallbackCached?.value ?? 0,
+      label: fallbackCached?.label ?? 'Neutro',
+      classification_en: fallbackCached?.classification_en ?? 'Neutral',
+      updated_at: fallbackCached?.updated_at ?? new Date().toISOString(),
+      cached: Boolean(fallbackCached),
+      fallback: true
+    };
+  }
   const response = await instrumentDependency('news_provider', 'fear_greed', () => fetch(`${NEWS_BASE_URL}/market/fear-greed`));
   if (!response.ok) {
     throw new Error('Failed to fetch fear/greed');
