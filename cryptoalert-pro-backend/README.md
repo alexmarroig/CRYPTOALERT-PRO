@@ -113,3 +113,36 @@ Compatível com Railway/Render/Vercel Serverless. Garanta:
 - **Nunca** retornamos `api_secret` em respostas.
 - `exchange_connections` guarda `api_secret_encrypted` com AES-256-GCM.
 - Nenhuma execução de trade é realizada neste backend.
+
+## Frontend quality gates (Playwright)
+
+Esta API inclui uma suíte Playwright para validar o frontend publicado em `FRONTEND_URL`.
+
+### Cobertura
+- **Smoke + fluxos críticos:** carregamento de rotas principais.
+- **Regressão visual:** snapshots baseline por página principal, locale e device.
+- **i18n PT/EN:** valida aplicação de locale `pt-BR` e `en-US`.
+- **Responsividade mobile-first:** valida ausência de overflow horizontal em mobile.
+- **Acessibilidade (axe):** auditoria WCAG 2A/2AA em componentes críticos.
+
+### Scripts
+```bash
+npm run test:e2e
+npm run test:e2e:smoke
+npm run test:e2e:update-snapshots
+```
+
+### Pré-requisitos
+1. Frontend rodando ou publicado e acessível em `FRONTEND_URL`.
+2. Browsers Playwright instalados:
+```bash
+npx playwright install --with-deps
+```
+
+### CI
+Pipeline em `.github/workflows/frontend-e2e.yml` com matrix:
+- chromium-desktop
+- firefox-desktop
+- webkit-desktop
+- mobile-chrome
+- mobile-safari
