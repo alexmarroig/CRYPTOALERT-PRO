@@ -1,6 +1,7 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
-import { fetchFearGreed, fetchNews, fetchNewsCategories } from '../services/newsService.js';
+import { AppError } from '../errors/AppError.js';
+import { getFearGreedIndex, getNewsCategoriesList, getNewsFeed } from '../services/newsService.js';
 
 const newsQuerySchema = z.object({
   limit: z.string().optional(),
@@ -25,18 +26,18 @@ function parseLimit(value?: string) {
   return Math.min(Math.max(Math.trunc(parsed), 1), MAX_LIMIT);
 }
 
-export async function getNews(req: Request, res: Response) {
-  const parse = newsQuerySchema.safeParse(req.query);
-  if (!parse.success) {
-    return res.status(400).json({ error: parse.error.flatten() });
-  }
-
-  const limit = parseLimit(parse.data.limit);
-  const category = sanitizeText(parse.data.category, 40);
-  const query = sanitizeText(parse.data.q, 80);
-
+export async function getNews(req: Request, res: Response, next: NextFunction) {
   try {
-    const { items, cached } = await fetchNews({
+    const parse = newsQuerySchema.safeParse(req.query);
+    if (!parse.success) {
+      throw new AppError('Invalid query params', 400, { code: 'VALIDATION_ERROR', details: parse.error.flatten() });
+    }
+
+    const limit = parseLimit(parse.data.limit);
+    const category = sanitizeText(parse.data.category, 40);
+    const query = sanitizeText(parse.data.q, 80);
+
+    const { items, cached, fallback } = await getNewsFeed({
       limit,
       category,
       query,
@@ -47,34 +48,34 @@ export async function getNews(req: Request, res: Response) {
       items,
       meta: {
         provider: 'free-crypto-news',
-        cached
+        cached,
+        fallback
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch news';
-    return res.status(502).json({ error: message });
+    return next(error);
   }
 }
 
-export async function getNewsCategories(_req: Request, res: Response) {
+export async function getNewsCategories(_req: Request, res: Response, next: NextFunction) {
   try {
-    const { categories, cached } = await fetchNewsCategories();
+    const { categories, cached, fallback } = await getNewsCategoriesList();
     return res.json({
       categories,
       meta: {
         provider: 'free-crypto-news',
-        cached
+        cached,
+        fallback
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch categories';
-    return res.status(502).json({ error: message });
+    return next(error);
   }
 }
 
-export async function getFearGreed(req: Request, res: Response) {
+export async function getFearGreed(_req: Request, res: Response, next: NextFunction) {
   try {
-    const result = await fetchFearGreed();
+    const result = await getFearGreedIndex();
     return res.json({
       value: result.value,
       label: result.label,
@@ -82,11 +83,11 @@ export async function getFearGreed(req: Request, res: Response) {
       updated_at: result.updated_at,
       meta: {
         provider: 'free-crypto-news',
-        cached: result.cached
+        cached: result.cached,
+        fallback: result.fallback
       }
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch fear/greed';
-    return res.status(502).json({ error: message });
+    return next(error);
   }
 }

@@ -3,7 +3,7 @@ import cors from 'cors';
 import { v1Routes } from './routes/v1/index.js';
 import { apiRateLimit } from './middleware/rateLimit.js';
 import { auditLogger } from './middleware/audit.js';
-import { logger } from './utils/logger.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
   const app = express();
@@ -31,10 +31,7 @@ export function createApp() {
 
   app.use('/v1', v1Routes);
 
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logger.error('Unhandled error', { message: err.message });
-    res.status(500).json({ error: 'Internal server error' });
-  });
+  app.use(errorHandler);
 
   return app;
 }
