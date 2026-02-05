@@ -1,0 +1,55 @@
+name: DAST Staging (/v1/*)
+
+on:
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: 'Base URL de staging (ex.: https://staging.cryptoalert.pro)'
+        required: true
+  schedule:
+    - cron: '30 3 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  zap-baseline:
+    name: OWASP ZAP Baseline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        id: target
+        env:
+          STAGING_URL_INPUT: ${{ github.event.inputs.staging_url }}
+          STAGING_URL_SECRET: ${{ secrets.STAGING_BASE_URL }}
+        run: |
+          target="${STAGING_URL_INPUT:-$STAGING_URL_SECRET}"
+          if [ -z "$target" ]; then
+            echo "Missing staging URL. Set workflow input or STAGING_BASE_URL secret." >&2
+            exit 1
+          fi
+          echo "url=$target" >> "$GITHUB_OUTPUT"
+
+      - name: Run ZAP Baseline
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ steps.target.outputs.url }}/v1
+          cmd_options: >-
+            -a
+            -j
+            -m 5
+            -I
+            -z "-config ajaxSpider.maxDuration=3"
+
+      - name: Upload ZAP report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: |
+            report_html.html
+            report_md.md
+            report_json.json

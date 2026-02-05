@@ -1,0 +1,60 @@
+name: Frontend E2E (Smoke + Visual + A11y)
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium-desktop, firefox-desktop, webkit-desktop, mobile-chrome, mobile-safari]
+    env:
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Validate FRONTEND_URL is configured
+        run: |
+          if [ -z "$FRONTEND_URL" ]; then
+            echo "FRONTEND_URL secret is not configured" >&2
+            exit 1
+          fi
+
+      - name: Run project smoke/i18n/visual/a11y suite
+        run: npx playwright test --project=${{ matrix.project }}
+
+      - name: Upload playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.project }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload snapshots and failed artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-${{ matrix.project }}
+          path: |
+            test-results/
+            tests/e2e/.snapshots/
+          retention-days: 14

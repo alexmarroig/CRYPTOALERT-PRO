@@ -4,7 +4,7 @@ import { z } from 'zod';
 dotenv.config();
 
 const envSchema = z.object({
-  NODE_ENV: z.string().default('development'),
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.string().default('3000'),
   FRONTEND_URL: z.string().url().optional(),
   SUPABASE_URL: z.string().url(),
@@ -20,7 +20,7 @@ const envSchema = z.object({
   FCM_SERVICE_ACCOUNT_JSON: z.string().min(10).optional(),
   REDIS_URL: z.string().min(10).optional(),
   JWT_SECRET: z.string().min(16),
-  ENCRYPTION_KEY: z.string().min(32),
+  ENCRYPTION_KEY: z.string().regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY must be 64 hex characters'),
   COINGECKO_API_KEY: z.string().optional(),
   DEV_SEED_KEY: z.string().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
@@ -37,6 +37,22 @@ const envSchema = z.object({
 }).refine((data) => data.FIREBASE_SERVICE_ACCOUNT || data.FCM_SERVICE_ACCOUNT_JSON, {
   message: 'Missing Firebase service account JSON',
   path: ['FCM_SERVICE_ACCOUNT_JSON']
+}).refine((data) => {
+  const blockedValues = new Set(['changeme', 'replace-me', 'test', 'dummy', 'placeholder']);
+  const secretFields = [
+    data.SUPABASE_SERVICE_ROLE_KEY,
+    data.JWT_SECRET,
+    data.STRIPE_SECRET ?? data.STRIPE_SECRET_KEY ?? '',
+    data.STRIPE_WEBHOOK_SECRET
+  ];
+
+  return secretFields.every((value) => {
+    const normalized = value.trim().toLowerCase();
+    return !blockedValues.has(normalized);
+  });
+}, {
+  message: 'One or more secrets are using placeholder values',
+  path: ['JWT_SECRET']
 });
 
 export const env = envSchema.parse(process.env);
