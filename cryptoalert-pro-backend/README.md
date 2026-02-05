@@ -135,6 +135,24 @@ Compatível com Railway/Render/Vercel Serverless. Garanta:
 - `exchange_connections` guarda `api_secret_encrypted` com AES-256-GCM.
 - Nenhuma execução de trade é realizada neste backend.
 
+### Incident Risk Intelligence (preventivo)
+Pipeline inicial para previsão de risco de incidente operacional nas próximas horas:
+1. Coleta de telemetria histórica por serviço/rota (`errorRate`, latência p95/p99, memória, CPU, retries e timeout).
+2. ETL para feature store simples em séries temporais agregadas por janela.
+3. Treino de modelo baseline de classificação (logística incremental para versão inicial).
+4. Inferência batch e near-real-time com score de risco + top fatores.
+5. Geração de alertas preventivos quando score excede limiar.
+6. Backtesting com métricas de AUC, precision@k e recall de incidentes.
+
+Rotas:
+- `POST /v1/incident-risk/telemetry`
+- `POST /v1/incident-risk/etl/run`
+- `POST /v1/incident-risk/model/train`
+- `POST /v1/incident-risk/infer/batch`
+- `GET /v1/incident-risk/infer/live`
+- `POST /v1/incident-risk/alerts/evaluate`
+- `POST /v1/incident-risk/backtest`
+- `GET /v1/incident-risk/summary`
 ## Frontend quality gates (Playwright)
 
 Esta API inclui uma suíte Playwright para validar o frontend publicado em `FRONTEND_URL`.

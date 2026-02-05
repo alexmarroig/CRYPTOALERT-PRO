@@ -248,6 +248,8 @@ const authUsers = new Map();
 
 beforeEach(async () => {
   const { supabaseAdmin } = await import('../src/config/supabase.js');
+  const { incidentRiskService } = await import('../src/services/incidentRisk/incidentRiskService.js');
+  incidentRiskService.reset();
 
   state.profiles = [
     { id: '11111111-1111-1111-1111-111111111111', email: 'admin@example.com', username: 'admin', display_name: 'Admin', role: 'admin', plan: 'free' },
@@ -517,6 +519,86 @@ test('news proxy returns normalized items', async () => {
   assert.equal(response.body.items.length, 1);
   assert.equal(response.body.items[0].id, 'news-1');
 });
+
+test('incident-risk pipeline ingests telemetry, runs ETL, trains and infers', async () => {
+  const app = await loadApp();
+  const baseTs = Date.now() - 60 * 60 * 1000;
+
+  const events = Array.from({ length: 60 }).map((_, idx) => {
+    const isIncident = idx >= 40;
+    return {
+      timestamp: new Date(baseTs + idx * 60_000).toISOString(),
+      service: 'alerts-api',
+      route: '/v1/alerts',
+      statusCode: isIncident && idx % 2 === 0 ? 500 : 200,
+      latencyMs: isIncident ? 1800 + idx * 3 : 120 + idx,
+      memoryMb: isIncident ? 850 : 420,
+      cpuPct: isIncident ? 92 : 45,
+      retries: isIncident ? 2 : 0,
+      timeout: isIncident && idx % 3 === 0
+    };
+  });
+
+  const ingest = await request(app)
+    .post('/v1/incident-risk/telemetry')
+    .send({ events });
+  assert.equal(ingest.status, 202);
+  assert.equal(ingest.body.ingested, 60);
+
+  const etl = await request(app)
+    .post('/v1/incident-risk/etl/run')
+    .send({ bucketMinutes: 10, lookbackHours: 168 });
+  assert.equal(etl.status, 200);
+  assert.ok(etl.body.generatedRows > 0);
+
+  const train = await request(app)
+    .post('/v1/incident-risk/model/train')
+    .send({ horizonHours: 2, incidentThreshold: 0.2, learningRate: 0.1, epochs: 80 });
+  assert.equal(train.status, 200);
+  assert.ok(train.body.trainedRows > 0);
+
+  const live = await request(app)
+    .get('/v1/incident-risk/infer/live?service=alerts-api&route=/v1/alerts');
+  assert.equal(live.status, 200);
+  assert.equal(live.body.predictions.length, 1);
+  assert.ok(typeof live.body.predictions[0].riskScore === 'number');
+  assert.ok(Array.isArray(live.body.predictions[0].topFactors));
+
+  const backtest = await request(app)
+    .post('/v1/incident-risk/backtest')
+    .send({ horizonHours: 2, incidentThreshold: 0.2, topK: 3 });
+  assert.equal(backtest.status, 200);
+  assert.ok(backtest.body.auc >= 0 && backtest.body.auc <= 1);
+});
+
+test('incident-risk emits preventive alerts above threshold', async () => {
+  const app = await loadApp();
+  const baseTs = Date.now() - 30 * 60 * 1000;
+
+  const events = Array.from({ length: 30 }).map((_, idx) => ({
+    timestamp: new Date(baseTs + idx * 60_000).toISOString(),
+    service: 'portfolio-api',
+    route: '/v1/portfolio/sync',
+    statusCode: idx > 20 ? 500 : 200,
+    latencyMs: idx > 20 ? 2200 : 150,
+    memoryMb: idx > 20 ? 950 : 430,
+    cpuPct: idx > 20 ? 96 : 40,
+    retries: idx > 20 ? 3 : 0,
+    timeout: idx > 20
+  }));
+
+  await request(app).post('/v1/incident-risk/telemetry').send({ events });
+  await request(app).post('/v1/incident-risk/etl/run').send({ bucketMinutes: 10, lookbackHours: 168 });
+  await request(app).post('/v1/incident-risk/model/train').send({ horizonHours: 2, incidentThreshold: 0.2, epochs: 80 });
+
+  const alerts = await request(app)
+    .post('/v1/incident-risk/alerts/evaluate')
+    .send({ threshold: 0 });
+
+  assert.equal(alerts.status, 200);
+  assert.ok(alerts.body.count >= 1);
+});
+
 
 
 test('admin ops anomaly pipeline creates incident and feedback', async () => {
