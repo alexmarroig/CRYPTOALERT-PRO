@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "CryptoAlert Pro API",
-    "version": "1.0.0",
-    "description": "API REST para CryptoAlert Pro (alertas, posts, portfolio read-only, billing e notificações)."
+    "version": "1.1.0",
+    "description": "API REST informativa para alertas/recomendações, social e portfolio read-only. Não executa trades automaticamente."
   },
   "servers": [
     {
@@ -13,7 +13,7 @@
   "paths": {
     "/me": {
       "get": {
-        "summary": "Retorna o perfil do usuário logado",
+        "summary": "Perfil logado",
         "responses": {
           "200": {
             "description": "Perfil retornado"
@@ -21,7 +21,7 @@
         }
       },
       "patch": {
-        "summary": "Atualiza dados do perfil",
+        "summary": "Atualiza perfil",
         "responses": {
           "200": {
             "description": "Perfil atualizado"
@@ -31,125 +31,113 @@
     },
     "/auth/accept-invite": {
       "post": {
-        "summary": "Aceita convite de influencer",
-        "responses": {
-          "200": {
-            "description": "Convite aceito"
-          }
-        }
+        "summary": "Aceita convite de Expert"
       }
     },
     "/admin/invites": {
       "get": {
-        "summary": "Lista convites de influencer",
-        "responses": {
-          "200": {
-            "description": "Lista de convites"
-          }
-        }
+        "summary": "Lista convites"
       },
       "post": {
-        "summary": "Cria convite de influencer",
-        "responses": {
-          "201": {
-            "description": "Convite criado"
-          }
-        }
+        "summary": "Cria convite"
       }
     },
     "/admin/invites/{id}/revoke": {
       "post": {
-        "summary": "Revoga convite",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Convite revogado"
-          }
-        }
+        "summary": "Revoga convite"
       }
     },
     "/admin/influencers": {
       "get": {
-        "summary": "Lista influencers",
-        "responses": {
-          "200": {
-            "description": "Lista de influencers"
-          }
-        }
+        "summary": "Lista Experts"
       }
     },
-    "/follow": {
+    "/admin/ops/telemetry": {
       "post": {
-        "summary": "Segue um perfil",
-        "responses": {
-          "201": {
-            "description": "Follow criado"
-          }
-        }
-      }
-    },
-    "/follow/{followingId}": {
-      "delete": {
-        "summary": "Remove follow",
+        "summary": "Ingestão de telemetria (admin)",
         "parameters": [
           {
-            "name": "followingId",
-            "in": "path",
-            "required": true,
+            "in": "header",
+            "name": "Idempotency-Key",
             "schema": {
               "type": "string"
             }
           }
-        ],
-        "responses": {
-          "204": {
-            "description": "Follow removido"
+        ]
+      }
+    },
+    "/admin/ops/events": {
+      "post": {
+        "summary": "Registro de evento operacional (admin)",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "schema": {
+              "type": "string"
+            }
           }
-        }
+        ]
+      }
+    },
+    "/admin/ops/analyze": {
+      "post": {
+        "summary": "Analisa anomalias"
+      }
+    },
+    "/admin/ops/incidents": {
+      "get": {
+        "summary": "Lista incidentes operacionais"
+      }
+    },
+    "/admin/ops/incidents/{id}/feedback": {
+      "post": {
+        "summary": "Feedback de incidente"
+      }
+    },
+    "/admin/incidents": {
+      "get": {
+        "summary": "Painel consolidado de incidentes"
+      }
+    },
+    "/follow": {
+      "post": {
+        "summary": "Seguir perfil"
+      }
+    },
+    "/follow/{followingId}": {
+      "delete": {
+        "summary": "Deixar de seguir"
       }
     },
     "/following": {
       "get": {
-        "summary": "Lista perfis seguidos",
-        "responses": {
-          "200": {
-            "description": "Lista de follows"
-          }
-        }
+        "summary": "Lista seguindo"
       }
     },
     "/followers": {
       "get": {
-        "summary": "Lista seguidores",
-        "responses": {
-          "200": {
-            "description": "Lista de seguidores"
-          }
-        }
+        "summary": "Lista seguidores"
+      }
+    },
+    "/ranking": {
+      "get": {
+        "summary": "Ranking público por performance percentual"
+      }
+    },
+    "/ranking/friends": {
+      "get": {
+        "summary": "Ranking de amigos por performance percentual"
       }
     },
     "/alerts": {
       "get": {
-        "summary": "Lista alertas",
-        "responses": {
-          "200": {
-            "description": "Lista de alertas"
-          }
-        },
+        "summary": "Lista alertas informativos",
+        "description": "Conteúdo apenas informativo, sem execução automática.",
         "parameters": [
           {
-            "name": "status",
             "in": "query",
-            "required": false,
+            "name": "status",
             "schema": {
               "type": "string",
               "enum": [
@@ -157,228 +145,154 @@
                 "closed",
                 "all"
               ]
-            },
-            "description": "Filtro de status (default active)"
+            }
+          },
+          {
+            "in": "query",
+            "name": "filter",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "buy",
+                "sell"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "following",
+                "creator",
+                "all"
+              ]
+            }
           }
         ]
       },
       "post": {
-        "summary": "Cria alerta",
-        "responses": {
-          "201": {
-            "description": "Alerta criado"
-          }
-        }
+        "summary": "Cria alerta informativo"
       }
     },
     "/alerts/{id}/status": {
       "patch": {
-        "summary": "Atualiza status do alerta",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Status atualizado"
-          }
-        }
+        "summary": "Atualiza status do alerta"
       }
     },
     "/posts": {
       "get": {
-        "summary": "Lista posts",
-        "responses": {
-          "200": {
-            "description": "Lista de posts"
-          }
-        }
+        "summary": "Lista posts"
       },
       "post": {
-        "summary": "Cria post",
-        "responses": {
-          "201": {
-            "description": "Post criado"
-          }
-        }
+        "summary": "Cria post"
       }
     },
     "/portfolio/connect": {
       "post": {
-        "summary": "Conecta exchange ao portfolio",
-        "responses": {
-          "201": {
-            "description": "Conexão salva"
-          }
-        }
+        "summary": "Conecta exchange read-only"
       }
     },
     "/portfolio/test-connection": {
       "post": {
-        "summary": "Testa conexão com exchange",
-        "responses": {
-          "200": {
-            "description": "Conexão válida"
-          }
-        }
+        "summary": "Testa conexão de exchange"
       }
     },
     "/portfolio/sync": {
       "post": {
-        "summary": "Sincroniza snapshot do portfolio",
-        "responses": {
-          "200": {
-            "description": "Snapshot atualizado"
-          }
-        }
+        "summary": "Sincroniza portfolio"
       }
     },
     "/portfolio/me": {
       "get": {
-        "summary": "Retorna snapshot do usuário",
-        "responses": {
-          "200": {
-            "description": "Snapshot retornado"
+        "summary": "Snapshot do portfolio"
+      }
+    },
+    "/portfolio/performance": {
+      "get": {
+        "summary": "Séries 7D/30D/90D",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "range",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d"
+              ]
+            }
           }
-        }
+        ]
+      }
+    },
+    "/portfolio/composition": {
+      "get": {
+        "summary": "Composição por ativos"
+      }
+    },
+    "/portfolio/reconciliation": {
+      "get": {
+        "summary": "Reconciliação carteira x ledger"
+      }
+    },
+    "/portfolio/goals-alerts": {
+      "get": {
+        "summary": "Lê metas e alertas de patrimônio"
+      },
+      "put": {
+        "summary": "Atualiza metas e alertas de patrimônio"
       }
     },
     "/portfolio/visibility": {
       "patch": {
-        "summary": "Atualiza visibilidade do portfolio",
-        "responses": {
-          "200": {
-            "description": "Visibilidade atualizada"
-          }
-        }
+        "summary": "Atualiza visibilidade"
       }
     },
     "/portfolio/public/{username}": {
       "get": {
-        "summary": "Retorna portfolio público",
-        "parameters": [
-          {
-            "name": "username",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Portfolio público"
-          }
-        }
+        "summary": "Portfolio público conforme visibilidade"
       }
     },
     "/influencer/metrics/me": {
       "get": {
-        "summary": "Métricas do influencer",
-        "responses": {
-          "200": {
-            "description": "Métricas retornadas"
-          }
-        }
+        "summary": "Métricas do Expert"
       }
     },
     "/notify/test": {
       "post": {
-        "summary": "Dispara notificação de teste",
-        "responses": {
-          "200": {
-            "description": "Notificação enviada"
-          }
-        }
+        "summary": "Push de teste"
       }
     },
     "/push/register": {
       "post": {
-        "summary": "Registra token de push",
-        "responses": {
-          "201": {
-            "description": "Token registrado"
-          }
-        }
+        "summary": "Registra token push"
       }
     },
     "/billing/checkout": {
       "post": {
-        "summary": "Cria sessão de checkout Stripe",
-        "responses": {
-          "200": {
-            "description": "Checkout criado"
-          }
-        }
+        "summary": "Checkout Stripe"
       }
     },
     "/billing/status": {
       "get": {
-        "summary": "Retorna status de billing",
-        "responses": {
-          "200": {
-            "description": "Status retornado"
-          }
-        }
+        "summary": "Status de billing"
       }
     },
     "/billing/webhook": {
       "post": {
-        "summary": "Webhook Stripe",
-        "responses": {
-          "200": {
-            "description": "Webhook processado"
-          }
-        }
+        "summary": "Webhook Stripe (raw body)"
       }
     },
     "/news": {
       "get": {
-        "summary": "Lista notícias com cache e proxy",
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "category",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "pt",
-                "en"
-              ]
-            }
-          }
-        ],
+        "summary": "Feed de notícias normalizado",
         "responses": {
           "200": {
-            "description": "Lista de notícias normalizadas",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -387,7 +301,33 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "type": "object"
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "published_at": {
+                            "type": "string"
+                          },
+                          "assets": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "summary": {
+                            "type": "string"
+                          }
+                        }
                       }
                     },
                     "meta": {
@@ -398,95 +338,73 @@
                         },
                         "cached": {
                           "type": "boolean"
+                        },
+                        "ttl_seconds": {
+                          "type": "number"
                         }
-                      },
-                      "required": [
-                        "provider",
-                        "cached"
-                      ]
+                      }
                     }
-                  },
-                  "required": [
-                    "items",
-                    "meta"
-                  ]
+                  }
                 }
               }
             }
           },
-          "502": {
-            "description": "Falha do provider externo",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExternalProviderError"
-                }
-              }
+          "503": {
+            "description": "Provider indisponível e sem cache"
+          }
+        },
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lang",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pt",
+                "en"
+              ]
             }
           }
-        }
+        ]
       }
     },
     "/news/categories": {
       "get": {
-        "summary": "Lista categorias de notícias",
+        "summary": "Categorias de notícias",
         "responses": {
           "200": {
-            "description": "Categorias de notícias",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "categories": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "properties": {
-                        "provider": {
-                          "type": "string"
-                        },
-                        "cached": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "provider",
-                        "cached"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "categories",
-                    "meta"
-                  ]
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Falha do provider externo",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExternalProviderError"
-                }
-              }
-            }
+            "description": "OK"
           }
         }
       }
     },
     "/market/fear-greed": {
       "get": {
-        "summary": "Índice de medo e ganância (proxy)",
+        "summary": "Fear & Greed normalizado",
         "responses": {
           "200": {
-            "description": "Índice Fear & Greed",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -495,15 +413,14 @@
                     "value": {
                       "type": "number"
                     },
-                    "label": {
+                    "label_pt": {
                       "type": "string"
                     },
-                    "classification_en": {
+                    "label_en": {
                       "type": "string"
                     },
                     "updated_at": {
-                      "type": "string",
-                      "format": "date-time"
+                      "type": "string"
                     },
                     "meta": {
                       "type": "object",
@@ -513,31 +430,13 @@
                         },
                         "cached": {
                           "type": "boolean"
+                        },
+                        "ttl_seconds": {
+                          "type": "number"
                         }
-                      },
-                      "required": [
-                        "provider",
-                        "cached"
-                      ]
+                      }
                     }
-                  },
-                  "required": [
-                    "value",
-                    "label",
-                    "classification_en",
-                    "updated_at",
-                    "meta"
-                  ]
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "Falha do provider externo",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ExternalProviderError"
+                  }
                 }
               }
             }
@@ -547,101 +446,78 @@
     },
     "/experts": {
       "get": {
-        "summary": "Lista experts para discovery",
-        "parameters": [
-          {
-            "name": "query",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Lista paginada de experts"
-          }
-        }
+        "summary": "Discovery de Experts"
       }
     },
     "/experts/{username}": {
       "get": {
-        "summary": "Detalhe público do expert",
+        "summary": "Perfil de Expert + alertas/posts/portfolio público"
+      }
+    },
+    "/dev/seed": {
+      "post": {
+        "summary": "Seed de desenvolvimento",
         "parameters": [
           {
-            "name": "username",
-            "in": "path",
+            "in": "header",
+            "name": "X-Dev-Seed-Key",
             "required": true,
             "schema": {
               "type": "string"
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Perfil público do expert"
-          }
-        }
+        "description": "Permitido apenas fora de produção (NODE_ENV != production)."
       }
     },
-    "/dev/seed": {
+    "/incident-risk/telemetry": {
       "post": {
-        "summary": "Seed de contas e conteúdo demo (dev only)",
-        "responses": {
-          "200": {
-            "description": "Seed executado"
-          }
-        }
+        "summary": "Ingestão de telemetria de risco"
       }
-    }
-  },
-  "components": {
-    "schemas": {
-      "ExternalProviderError": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "type": "integer",
-            "example": 502
-          },
-          "error": {
-            "type": "object",
-            "properties": {
-              "code": {
-                "type": "string",
-                "enum": [
-                  "EXTERNAL_PROVIDER_UNAVAILABLE",
-                  "EXTERNAL_PROVIDER_TIMEOUT"
-                ]
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "code",
-              "message"
-            ]
-          }
-        },
-        "required": [
-          "status",
-          "error"
-        ]
+    },
+    "/incident-risk/etl/run": {
+      "post": {
+        "summary": "Executa ETL"
+      }
+    },
+    "/incident-risk/model/train": {
+      "post": {
+        "summary": "Treina modelo"
+      }
+    },
+    "/incident-risk/infer/batch": {
+      "post": {
+        "summary": "Inferência batch"
+      }
+    },
+    "/incident-risk/infer/live": {
+      "get": {
+        "summary": "Inferência live"
+      }
+    },
+    "/incident-risk/alerts/evaluate": {
+      "post": {
+        "summary": "Avalia alertas preventivos"
+      }
+    },
+    "/incident-risk/backtest": {
+      "post": {
+        "summary": "Backtest"
+      }
+    },
+    "/incident-risk/summary": {
+      "get": {
+        "summary": "Resumo do modelo"
+      }
+    },
+    "/ops/dashboard": {
+      "get": {
+        "summary": "Painel operacional (admin)"
+      }
+    },
+    "/ops/alerts": {
+      "get": {
+        "summary": "Alertas operacionais (admin)"
       }
     }
   }

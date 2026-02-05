@@ -104,7 +104,6 @@ export async function getFriendRanking(req: Request, res: Response) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // 1. Get list of following users
   const { data: following, error: followingError } = await supabaseAdmin
     .from('follows')
     .select('following_id')
@@ -114,20 +113,21 @@ export async function getFriendRanking(req: Request, res: Response) {
     return res.status(500).json({ error: followingError.message });
   }
 
-  const ids = (following ?? []).map((f) => f.following_id);
-  ids.push(req.user.id); // Include self in ranking
+  const ids = Array.from(new Set([...(following ?? []).map((f) => f.following_id), req.user.id]));
 
-  // 2. Get 30d performance for these users
-  const { data: snapshots, error: snapshotError } = await supabaseAdmin
-    .from('portfolios_snapshot')
-    .select('user_id, change_pct_30d')
-    .in('user_id', ids)
-    .order('change_pct_30d', { ascending: false })
-    .limit(100);
+  const [{ data: snapshots, error: snapshotError }, { data: visibility }] = await Promise.all([
+    supabaseAdmin.from('portfolios_snapshot').select('user_id, change_pct_30d, updated_at').in('user_id', ids).order('change_pct_30d', { ascending: false }).limit(100),
+    supabaseAdmin.from('portfolio_visibility').select('user_id, visibility').in('user_id', ids)
+  ]);
 
   if (snapshotError) {
     return res.status(500).json({ error: snapshotError.message });
   }
 
-  return res.json({ ranking: snapshots });
+  const visibilityMap = new Map((visibility ?? []).map((row) => [row.user_id, row.visibility]));
+  const ranking = (snapshots ?? [])
+    .filter((item) => ['public', 'percent', 'friends'].includes(visibilityMap.get(item.user_id) ?? 'private'))
+    .map((item, idx) => ({ rank: idx + 1, user_id: item.user_id, change_pct_30d: item.change_pct_30d, visibility: visibilityMap.get(item.user_id) ?? 'private', updated_at: item.updated_at }));
+
+  return res.json({ ranking });
 }

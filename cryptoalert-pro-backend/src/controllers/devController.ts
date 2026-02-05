@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { supabaseAdmin } from '../config/supabase.js';
+import { logger } from '../utils/logger.js';
 
 const DEMO_ASSETS = [
   { symbol: 'BTC', pct: 60 },
@@ -9,15 +10,6 @@ const DEMO_ASSETS = [
 ];
 
 export async function seedDevData(req: Request, res: Response) {
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(404).json({ error: 'Not found' });
-  }
-
-  const seedKey = process.env.DEV_SEED_KEY;
-  if (!seedKey || req.header('X-Dev-Seed-Key') !== seedKey) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD;
   const expertEmail = process.env.EXPERT_EMAIL;
@@ -42,13 +34,16 @@ export async function seedDevData(req: Request, res: Response) {
   await ensureFollow(premium.id, expert.id, 'influencer');
   await ensurePortfolioSnapshots(expert.id, premium.id);
 
-  return res.json({
-    admin,
-    expert,
-    premium,
-    alerts,
-    posts
+  logger.info('audit.dev.seed', {
+    endpoint: req.originalUrl,
+    method: req.method,
+    actor_user_id: req.user?.id ?? null,
+    seeded_admin_id: admin.id,
+    seeded_expert_id: expert.id,
+    seeded_premium_id: premium.id
   });
+
+  return res.json({ admin, expert, premium, alerts, posts });
 }
 
 async function ensureUser(email: string, password: string, role: 'admin' | 'influencer' | 'user', usernamePrefix: string, plan = 'free') {
@@ -59,18 +54,8 @@ async function ensureUser(email: string, password: string, role: 'admin' | 'infl
     .single();
 
   if (existingProfile) {
-    await supabaseAdmin
-      .from('profiles')
-      .update({ role, plan })
-      .eq('id', existingProfile.id);
-
-    return {
-      id: existingProfile.id,
-      email,
-      password,
-      role,
-      plan
-    };
+    await supabaseAdmin.from('profiles').update({ role, plan }).eq('id', existingProfile.id);
+    return { id: existingProfile.id, email, password, role, plan };
   }
 
   const { data: userData, error } = await supabaseAdmin.auth.admin.createUser({
@@ -85,70 +70,42 @@ async function ensureUser(email: string, password: string, role: 'admin' | 'infl
 
   const username = `${usernamePrefix}-${randomUUID().slice(0, 8)}`;
 
-  await supabaseAdmin
-    .from('profiles')
-    .insert({
-      id: userData.user.id,
-      email,
-      username,
-      display_name: username,
-      role,
-      plan
-    });
-
-  return {
+  await supabaseAdmin.from('profiles').insert({
     id: userData.user.id,
     email,
-    password,
+    username,
+    display_name: username,
     role,
     plan
-  };
+  });
+
+  return { id: userData.user.id, email, password, role, plan };
 }
 
 async function ensureAlerts(creatorId: string) {
-  const { data: existing } = await supabaseAdmin
-    .from('alerts')
-    .select('id')
-    .eq('creator_id', creatorId);
-
-  if ((existing ?? []).length >= 3) {
-    return existing;
-  }
+  const { data: existing } = await supabaseAdmin.from('alerts').select('id').eq('creator_id', creatorId);
+  if ((existing ?? []).length >= 3) return existing;
 
   const payload = [
-    { asset: 'BTC', side: 'buy', reason_text: 'Recomendação informativa: tendência positiva.' },
-    { asset: 'ETH', side: 'sell', reason_text: 'Alerta informativo: resistência próxima.' },
-    { asset: 'SOL', side: 'buy', reason_text: 'Recomendação informativa: volume crescente.' }
+    { asset: 'BTC', side: 'buy', reason_text: 'Alerta informativo: possível continuação de alta.' },
+    { asset: 'ETH', side: 'sell', reason_text: 'Alerta informativo: risco de correção no curto prazo.' },
+    { asset: 'SOL', side: 'buy', reason_text: 'Alerta informativo: volume comprador crescente.' }
   ];
 
-  const { data } = await supabaseAdmin
-    .from('alerts')
-    .insert(payload.map((item) => ({ ...item, creator_id: creatorId })))
-    .select();
-
+  const { data } = await supabaseAdmin.from('alerts').insert(payload.map((item) => ({ ...item, creator_id: creatorId }))).select();
   return data ?? [];
 }
 
 async function ensurePosts(creatorId: string) {
-  const { data: existing } = await supabaseAdmin
-    .from('posts')
-    .select('id')
-    .eq('creator_id', creatorId);
-
-  if ((existing ?? []).length >= 2) {
-    return existing;
-  }
+  const { data: existing } = await supabaseAdmin.from('posts').select('id').eq('creator_id', creatorId);
+  if ((existing ?? []).length >= 2) return existing;
 
   const payload = [
-    { text: 'Atualização informativa: observe volatilidade nas próximas horas.' },
-    { text: 'Resumo do dia: mercados em consolidação, sem indicação de operação.' }
+    { text: 'Atualização informativa: mantenha gestão de risco e tamanho de posição.' },
+    { text: 'Resumo do dia: cenário lateral, sem recomendação automática de execução.' }
   ];
 
-  const { data } = await supabaseAdmin
-    .from('posts')
-    .insert(payload.map((item) => ({ ...item, creator_id: creatorId })))
-    .select();
-
+  const { data } = await supabaseAdmin.from('posts').insert(payload.map((item) => ({ ...item, creator_id: creatorId }))).select();
   return data ?? [];
 }
 
@@ -160,53 +117,17 @@ async function ensureFollow(followerId: string, followingId: string, followingTy
     .eq('following_id', followingId)
     .maybeSingle();
 
-  if (existing) {
-    return;
+  if (!existing) {
+    await supabaseAdmin.from('follows').insert({ follower_id: followerId, following_id: followingId, following_type: followingType });
   }
-
-  await supabaseAdmin
-    .from('follows')
-    .insert({
-      follower_id: followerId,
-      following_id: followingId,
-      following_type: followingType
-    });
 }
 
 async function ensurePortfolioSnapshots(expertId: string, premiumId: string) {
   const now = new Date().toISOString();
 
-  await supabaseAdmin
-    .from('portfolios_snapshot')
-    .upsert({
-      user_id: expertId,
-      total_value: 0,
-      change_pct_30d: 12.5,
-      assets: DEMO_ASSETS,
-      updated_at: now
-    }, { onConflict: 'user_id' });
+  await supabaseAdmin.from('portfolios_snapshot').upsert({ user_id: expertId, total_value: 0, change_pct_30d: 12.5, assets: DEMO_ASSETS, updated_at: now }, { onConflict: 'user_id' });
+  await supabaseAdmin.from('portfolio_visibility').upsert({ user_id: expertId, visibility: 'percent' });
 
-  await supabaseAdmin
-    .from('portfolio_visibility')
-    .upsert({
-      user_id: expertId,
-      visibility: 'percent'
-    });
-
-  await supabaseAdmin
-    .from('portfolios_snapshot')
-    .upsert({
-      user_id: premiumId,
-      total_value: 12000,
-      change_pct_30d: -1.2,
-      assets: DEMO_ASSETS,
-      updated_at: now
-    }, { onConflict: 'user_id' });
-
-  await supabaseAdmin
-    .from('portfolio_visibility')
-    .upsert({
-      user_id: premiumId,
-      visibility: 'private'
-    });
+  await supabaseAdmin.from('portfolios_snapshot').upsert({ user_id: premiumId, total_value: 12000, change_pct_30d: -1.2, assets: DEMO_ASSETS, updated_at: now }, { onConflict: 'user_id' });
+  await supabaseAdmin.from('portfolio_visibility').upsert({ user_id: premiumId, visibility: 'private' });
 }

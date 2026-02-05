@@ -1,3 +1,4 @@
+import type { Request } from 'express';
 import winston from 'winston';
 import { getTraceContext } from '../observability/telemetry.js';
 
@@ -12,7 +13,6 @@ const traceCorrelationFormat = winston.format((info) => {
   }
   return info;
 });
-import type { Request } from 'express';
 
 interface StructuredErrorLog {
   trace_id: string | null;
@@ -25,11 +25,7 @@ interface StructuredErrorLog {
 
 export const logger = winston.createLogger({
   level: 'info',
-  format: winston.format.combine(
-    traceCorrelationFormat(),
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
+  format: winston.format.combine(traceCorrelationFormat(), winston.format.timestamp(), winston.format.json()),
   transports: [
     new winston.transports.File({ filename: 'error.log', level: 'error' }),
     new winston.transports.File({ filename: 'combined.log' })
@@ -43,12 +39,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export function buildRequestLogContext(req: Request) {
-  return {
-    trace_id: req.traceId ?? null,
-    user_id: req.user?.id ?? null,
-    endpoint: req.originalUrl,
-    method: req.method
-  };
+  return { trace_id: req.traceId ?? null, user_id: req.user?.id ?? null, endpoint: req.originalUrl, method: req.method };
 }
 
 export function logStructuredError(payload: StructuredErrorLog) {

@@ -48,17 +48,17 @@ async function ensureProfile(userId: string, email: string) {
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Faça login para continuar.' });
   }
 
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data.user || !data.user.email) {
-    return res.status(401).json({ error: 'Unauthorized' });
+    return res.status(401).json({ error: 'Faça login para continuar.' });
   }
 
   const profile = await ensureProfile(data.user.id, data.user.email);
   if (!profile) {
-    return res.status(500).json({ error: 'Failed to load profile' });
+    return res.status(500).json({ error: 'Não foi possível carregar seu perfil.' });
   }
 
   req.authToken = token;

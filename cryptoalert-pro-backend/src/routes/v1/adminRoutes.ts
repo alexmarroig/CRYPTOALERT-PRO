@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createInfluencerInvite, listInfluencers, listInvites, revokeInfluencerInvite } from '../../controllers/adminController.js';
+import { createInfluencerInvite, getIncidentsPanel, listInfluencers, listInvites, revokeInfluencerInvite } from '../../controllers/adminController.js';
 import {
   analyzeOpsAnomalies,
   createOpsEvent,
@@ -7,7 +7,6 @@ import {
   ingestOpsTelemetry,
   submitIncidentFeedback
 } from '../../controllers/opsController.js';
-import { createInfluencerInvite, getIncidentsPanel, listInfluencers, listInvites, revokeInfluencerInvite } from '../../controllers/adminController.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { requireRole } from '../../middleware/roleCheck.js';
 import { invitesRateLimit } from '../../middleware/rateLimit.js';
