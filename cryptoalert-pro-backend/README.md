@@ -104,6 +104,10 @@ Execute o SQL em `supabase/migrations/001_init.sql` no editor SQL do Supabase.
 - `docs/openapi.json`
 
 
+## Monitoramento de jornadas (staging)
+- Runner sintético: `npm run journeys:staging`
+- Gate de KPI/regressão: `npm run journeys:gate`
+- Documentação: `docs/journey-observability.md`
 ## Qualidade e performance
 - Matriz de compatibilidade + critérios go/no-go: `docs/quality-gates.md`
 - Smoke de compatibilidade: `npm run test:compatibility`

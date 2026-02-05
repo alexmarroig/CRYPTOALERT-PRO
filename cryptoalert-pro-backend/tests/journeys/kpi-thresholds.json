@@ -1,0 +1,28 @@
+{
+  "global": {
+    "maxP95LatencyMs": 4000,
+    "minSuccessRate": 0.95
+  },
+  "flows": {
+    "onboarding": {
+      "maxP95LatencyMs": 3500,
+      "minSuccessRate": 0.95
+    },
+    "accept_invite": {
+      "maxP95LatencyMs": 4000,
+      "minSuccessRate": 0.95
+    },
+    "follow_expert": {
+      "maxP95LatencyMs": 3000,
+      "minSuccessRate": 0.98
+    },
+    "create_alert": {
+      "maxP95LatencyMs": 3000,
+      "minSuccessRate": 0.98
+    },
+    "sync_portfolio": {
+      "maxP95LatencyMs": 6000,
+      "minSuccessRate": 0.95
+    }
+  }
+}
