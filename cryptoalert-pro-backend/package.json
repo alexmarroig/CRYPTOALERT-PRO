@@ -8,7 +8,10 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "lint": "eslint . --ext .ts",
-    "test": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test"
+    "test": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test",
+    "test:security": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test tests/integration.test.js",
+    "security:verify-input": "node scripts/security/verify-controller-validation.mjs",
+    "security:gate": "node scripts/security/enforce-security-gate.mjs npm-audit.json"
   },
   "engines": {
     "node": "20.x"
