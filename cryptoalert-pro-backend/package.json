@@ -12,6 +12,14 @@
     "test:security": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test tests/integration.test.js",
     "security:verify-input": "node scripts/security/verify-controller-validation.mjs",
     "security:gate": "node scripts/security/enforce-security-gate.mjs npm-audit.json"
+    "journeys:staging": "node tests/journeys/synthetic-journeys.mjs",
+    "journeys:gate": "node tests/journeys/assert-kpis.mjs",
+    "test:e2e": "npm run test && npm run journeys:gate"
+    "test:compatibility": "node tests/compatibility/compatibility-smoke.mjs",
+    "perf:k6": "k6 run tests/performance/k6-critical-routes.js",
+    "perf:k6:load": "TEST_PROFILE=load k6 run tests/performance/k6-critical-routes.js",
+    "perf:k6:stress": "TEST_PROFILE=stress k6 run tests/performance/k6-critical-routes.js",
+    "perf:k6:soak": "TEST_PROFILE=soak k6 run tests/performance/k6-critical-routes.js"
   },
   "engines": {
     "node": "20.x"
