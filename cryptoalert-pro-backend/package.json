@@ -7,9 +7,36 @@
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "lint": "node scripts/ci/lint.mjs",
+    "test": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test tests/unit/**/*.test.js",
+    "test:integration": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test tests/integration.test.js",
+    "test:contract": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test tests/contract/**/*.test.js",
+    "test:ci": "npm run test:unit && npm run test:integration && npm run test:contract",
+    "test:unit:tap": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=tap tests/unit/**/*.test.js",
+    "test:integration:tap": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=tap tests/integration.test.js",
+    "test:contract:tap": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=tap tests/contract/**/*.test.js",
+    "reports:unit": "mkdir -p reports && NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=junit --test-reporter-destination=reports/unit.junit.xml tests/unit/**/*.test.js",
+    "reports:integration": "mkdir -p reports && NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=junit --test-reporter-destination=reports/integration.junit.xml tests/integration.test.js",
+    "reports:contract": "mkdir -p reports && NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=junit --test-reporter-destination=reports/contract.junit.xml tests/contract/**/*.test.js",
+    "coverage:ci": "mkdir -p reports/coverage/v8 && NODE_OPTIONS=--no-warnings NODE_V8_COVERAGE=reports/coverage/v8 node --loader ts-node/esm --test --experimental-test-coverage tests/unit/**/*.test.js tests/integration.test.js tests/contract/**/*.test.js > reports/coverage/summary.txt",
+    "security:scan": "npm audit --audit-level=high"
     "lint": "eslint . --ext .ts",
     "test": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --test-reporter=spec",
     "test:coverage": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test --experimental-test-coverage --test-coverage-include=\"src/controllers/**/*.ts\" --test-coverage-include=\"src/routes/v1/**/*.ts\" --test-coverage-include=\"src/services/newsService.ts\" --test-coverage-include=\"src/services/portfolioSync.ts\" --test-coverage-include=\"src/services/inviteService.ts\" --test-coverage-include=\"src/services/stripeService.ts\" --test-coverage-include=\"src/services/notifications.ts\" --test-coverage-lines=80"
+    "test": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test",
+    "test:security": "NODE_OPTIONS=--no-warnings node --loader ts-node/esm --test tests/integration.test.js",
+    "security:verify-input": "node scripts/security/verify-controller-validation.mjs",
+    "security:gate": "node scripts/security/enforce-security-gate.mjs npm-audit.json"
+    "journeys:staging": "node tests/journeys/synthetic-journeys.mjs",
+    "journeys:gate": "node tests/journeys/assert-kpis.mjs",
+    "test:e2e": "npm run test && npm run journeys:gate"
+    "test:compatibility": "node tests/compatibility/compatibility-smoke.mjs",
+    "perf:k6": "k6 run tests/performance/k6-critical-routes.js",
+    "perf:k6:load": "TEST_PROFILE=load k6 run tests/performance/k6-critical-routes.js",
+    "perf:k6:stress": "TEST_PROFILE=stress k6 run tests/performance/k6-critical-routes.js",
+    "perf:k6:soak": "TEST_PROFILE=soak k6 run tests/performance/k6-critical-routes.js"
   },
   "engines": {
     "node": "20.x"
