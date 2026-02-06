@@ -3,7 +3,7 @@
   "info": {
     "title": "CryptoAlert Pro API",
     "version": "1.1.0",
-    "description": "API REST informativa para alertas/recomendações, social e portfolio read-only. Não executa trades automaticamente."
+    "description": "API REST informativa para alertas/recomendações, social e portfolio read-only. Não executa trades automaticamente. Respostas seguem o padrão {\"request_id\":\"uuid\",\"data\":...} ou {\"request_id\":\"uuid\",\"error\":{...}}."
   },
   "servers": [
     {
@@ -298,49 +298,66 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "source": {
-                            "type": "string"
-                          },
-                          "url": {
-                            "type": "string"
-                          },
-                          "published_at": {
-                            "type": "string"
-                          },
-                          "assets": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          },
-                          "summary": {
-                            "type": "string"
-                          }
-                        }
-                      }
+                    "request_id": {
+                      "type": "string"
                     },
-                    "meta": {
+                    "data": {
                       "type": "object",
                       "properties": {
-                        "provider": {
-                          "type": "string"
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              },
+                              "published_at": {
+                                "type": "string"
+                              },
+                              "assets": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "summary": {
+                                "type": "string"
+                              },
+                              "sentiment": {
+                                "type": "string"
+                              }
+                            }
+                          }
                         },
-                        "cached": {
-                          "type": "boolean"
-                        },
-                        "ttl_seconds": {
-                          "type": "number"
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string"
+                            },
+                            "cached": {
+                              "type": "boolean"
+                            },
+                            "ttl_seconds": {
+                              "type": "number"
+                            },
+                            "degraded": {
+                              "type": "boolean"
+                            },
+                            "fetched_at": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     }
@@ -371,6 +388,13 @@
           {
             "in": "query",
             "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "assets",
             "schema": {
               "type": "string"
             }
@@ -410,29 +434,46 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "value": {
-                      "type": "number"
-                    },
-                    "label_pt": {
+                    "request_id": {
                       "type": "string"
                     },
-                    "label_en": {
-                      "type": "string"
-                    },
-                    "updated_at": {
-                      "type": "string"
-                    },
-                    "meta": {
+                    "data": {
                       "type": "object",
                       "properties": {
-                        "provider": {
+                        "value": {
+                          "type": "number"
+                        },
+                        "label_pt": {
                           "type": "string"
                         },
-                        "cached": {
-                          "type": "boolean"
+                        "label_en": {
+                          "type": "string"
                         },
-                        "ttl_seconds": {
-                          "type": "number"
+                        "updated_at": {
+                          "type": "string"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string"
+                            },
+                            "cached": {
+                              "type": "boolean"
+                            },
+                            "ttl_seconds": {
+                              "type": "number"
+                            },
+                            "degraded": {
+                              "type": "boolean"
+                            },
+                            "fetched_at": {
+                              "type": "string"
+                            },
+                            "note": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     }
@@ -508,6 +549,81 @@
     "/incident-risk/summary": {
       "get": {
         "summary": "Resumo do modelo"
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "summary": "Lista usuários (admin)"
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "summary": "Detalhe de usuário (admin)"
+      }
+    },
+    "/admin/subscriptions/summary": {
+      "get": {
+        "summary": "Resumo de assinaturas (admin)"
+      }
+    },
+    "/admin/usage/summary": {
+      "get": {
+        "summary": "Resumo de uso (admin)"
+      }
+    },
+    "/admin/errors/top": {
+      "get": {
+        "summary": "Erros mais frequentes (admin)"
+      }
+    },
+    "/admin/moderation/actions": {
+      "post": {
+        "summary": "Ações de moderação (admin)"
+      }
+    },
+    "/admin/moderation/queue": {
+      "get": {
+        "summary": "Fila de moderação (admin)"
+      }
+    },
+    "/admin/ops/costs/summary": {
+      "get": {
+        "summary": "Resumo de custos (admin)"
+      }
+    },
+    "/support/tickets": {
+      "post": {
+        "summary": "Cria ticket de suporte"
+      }
+    },
+    "/support/tickets/mine": {
+      "get": {
+        "summary": "Lista tickets do usuário"
+      }
+    },
+    "/admin/support/tickets": {
+      "get": {
+        "summary": "Lista tickets (admin)"
+      }
+    },
+    "/admin/support/tickets/{id}": {
+      "patch": {
+        "summary": "Atualiza ticket (admin)"
+      }
+    },
+    "/expert/dashboard/me": {
+      "get": {
+        "summary": "Dashboard do expert"
+      }
+    },
+    "/expert/profile": {
+      "patch": {
+        "summary": "Atualiza perfil do expert"
+      }
+    },
+    "/expert/alerts/bulk": {
+      "post": {
+        "summary": "Cria alertas em lote (expert)"
       }
     },
     "/ops/dashboard": {

@@ -12,9 +12,11 @@ import { billingRoutes } from './billingRoutes.js';
 import { rankingRoutes } from './rankingRoutes.js';
 import { newsRoutes } from './newsRoutes.js';
 import { expertsRoutes } from './expertsRoutes.js';
+import { expertRoutes } from './expertRoutes.js';
 import { devRoutes } from './devRoutes.js';
 import { incidentRiskRoutes } from './incidentRiskRoutes.js';
 import { opsRoutes } from './opsRoutes.js';
+import { supportRoutes } from './supportRoutes.js';
 
 export const v1Routes = Router();
 
@@ -31,7 +33,9 @@ v1Routes.use('/billing', billingRoutes);
 v1Routes.use('/', rankingRoutes);
 v1Routes.use('/', newsRoutes);
 v1Routes.use('/', expertsRoutes);
+v1Routes.use('/', expertRoutes);
 v1Routes.use('/', devRoutes);
+v1Routes.use('/', supportRoutes);
 
 v1Routes.use('/incident-risk', incidentRiskRoutes);
 v1Routes.use('/', opsRoutes);

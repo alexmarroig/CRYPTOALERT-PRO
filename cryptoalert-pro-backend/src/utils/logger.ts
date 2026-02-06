@@ -16,6 +16,8 @@ const traceCorrelationFormat = winston.format((info) => {
 
 interface StructuredErrorLog {
   trace_id: string | null;
+  request_id: string | null;
+  correlation_id?: string | null;
   user_id: string | null;
   endpoint: string;
   status: number;
@@ -39,7 +41,14 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 export function buildRequestLogContext(req: Request) {
-  return { trace_id: req.traceId ?? null, user_id: req.user?.id ?? null, endpoint: req.originalUrl, method: req.method };
+  return {
+    trace_id: req.traceId ?? null,
+    request_id: req.requestId ?? null,
+    correlation_id: req.requestId ?? null,
+    user_id: req.user?.id ?? null,
+    endpoint: req.originalUrl,
+    method: req.method
+  };
 }
 
 export function logStructuredError(payload: StructuredErrorLog) {

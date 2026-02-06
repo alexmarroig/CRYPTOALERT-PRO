@@ -34,3 +34,10 @@ export const newsRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: true
 });
+
+export const supportRateLimit = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: true
+});

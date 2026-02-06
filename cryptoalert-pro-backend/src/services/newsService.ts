@@ -1,4 +1,5 @@
 import { LruCache } from '../utils/lruCache.js';
+import { fetchFreeCryptoNews, fetchFreeCryptoNewsCategories } from './news/freeCryptoNews.js';
 
 export class ExternalProviderError extends Error {
   constructor(
@@ -10,27 +11,14 @@ export class ExternalProviderError extends Error {
   }
 }
 
-type NewsItem = {
-  id: string;
-  title: string;
-  source: string;
-  url: string;
-  published_at: string;
-  assets?: string[];
-  summary?: string;
-};
-
-type CacheMeta = { provider: string; cached: boolean; ttl_seconds: number };
+type CacheMeta = { provider: string; cached: boolean; ttl_seconds: number; degraded: boolean; fetched_at: string; note?: string };
 
 const PROVIDER = 'free-crypto-news';
 const BASE_URL = process.env.NEWS_PRIMARY_BASE_URL ?? 'https://news-crypto.vercel.app/api';
 const TIMEOUT_MS = Number(process.env.NEWS_REQUEST_TIMEOUT_MS ?? 8000);
 const NEWS_TTL_SECONDS = Number(process.env.NEWS_TTL_SECONDS ?? 60);
 const FEAR_GREED_TTL_SECONDS = Number(process.env.FEAR_GREED_TTL_SECONDS ?? 300);
-const CATEGORIES_TTL_SECONDS = Number(process.env.NEWS_CATEGORIES_TTL_SECONDS ?? 86400);
 
-const newsCache = new LruCache<NewsItem[]>(100);
-const categoriesCache = new LruCache<string[]>(10);
 const fearGreedCache = new LruCache<{ value: number; label_pt: 'Medo' | 'Neutro' | 'Ganância'; label_en: 'Fear' | 'Neutral' | 'Greed'; updated_at: string }>(5);
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -53,67 +41,16 @@ async function fetchJson<T>(url: string): Promise<T> {
   }
 }
 
-function normalizeNewsItem(item: Record<string, unknown>, index: number): NewsItem {
-  return {
-    id: typeof item.id === 'string' ? item.id : `news-${index}-${String(item.url ?? '')}`,
-    title: typeof item.title === 'string' ? item.title : 'Sem título',
-    source: typeof item.source === 'string' ? item.source : 'unknown',
-    url: typeof item.url === 'string' ? item.url : '',
-    published_at: typeof item.published_at === 'string' ? item.published_at : new Date().toISOString(),
-    assets: Array.isArray(item.assets) ? item.assets.filter((a): a is string => typeof a === 'string') : undefined,
-    summary: typeof item.summary === 'string' ? item.summary : undefined
-  };
-}
-
 export function resetNewsServiceState() {
   // no-op due LRU internal; tests rely on function existing.
 }
 
-export async function fetchNews(input: { limit: number; category?: string; query?: string; lang?: 'pt' | 'en' }) {
-  const key = JSON.stringify(input);
-  const cached = newsCache.get(key);
-  if (cached) {
-    return { items: cached, meta: { provider: PROVIDER, cached: true, ttl_seconds: NEWS_TTL_SECONDS } as CacheMeta };
-  }
-
-  const params = new URLSearchParams();
-  params.set('limit', String(input.limit));
-  if (input.category) params.set('category', input.category);
-  if (input.query) params.set('q', input.query);
-  if (input.lang) params.set('lang', input.lang);
-
-  try {
-    const payload = await fetchJson<{ items?: Record<string, unknown>[]; data?: Record<string, unknown>[] }>(`${BASE_URL}/news?${params.toString()}`);
-    const rawItems = payload.items ?? payload.data ?? [];
-    const items = rawItems.map(normalizeNewsItem);
-    newsCache.set(key, items, NEWS_TTL_SECONDS * 1000);
-    return { items, meta: { provider: PROVIDER, cached: false, ttl_seconds: NEWS_TTL_SECONDS } as CacheMeta };
-  } catch (error) {
-    if (cached) {
-      return { items: cached, meta: { provider: PROVIDER, cached: true, ttl_seconds: NEWS_TTL_SECONDS } as CacheMeta };
-    }
-    throw error;
-  }
+export async function fetchNews(input: { limit: number; category?: string; query?: string; lang?: 'pt' | 'en'; assets?: string[] }) {
+  return fetchFreeCryptoNews({ ...input });
 }
 
 export async function fetchNewsCategories() {
-  const key = 'news-categories';
-  const cached = categoriesCache.get(key);
-  if (cached) {
-    return { categories: cached, meta: { provider: PROVIDER, cached: true, ttl_seconds: CATEGORIES_TTL_SECONDS } as CacheMeta };
-  }
-
-  try {
-    const payload = await fetchJson<{ categories?: string[] }>(`${BASE_URL}/news/categories`);
-    const categories = (payload.categories ?? []).filter((i): i is string => typeof i === 'string');
-    categoriesCache.set(key, categories, CATEGORIES_TTL_SECONDS * 1000);
-    return { categories, meta: { provider: PROVIDER, cached: false, ttl_seconds: CATEGORIES_TTL_SECONDS } as CacheMeta };
-  } catch (error) {
-    if (cached) {
-      return { categories: cached, meta: { provider: PROVIDER, cached: true, ttl_seconds: CATEGORIES_TTL_SECONDS } as CacheMeta };
-    }
-    throw error;
-  }
+  return fetchFreeCryptoNewsCategories();
 }
 
 function translateFearGreed(classification: string): { label_pt: 'Medo' | 'Neutro' | 'Ganância'; label_en: 'Fear' | 'Neutral' | 'Greed' } {
@@ -127,7 +64,7 @@ export async function fetchFearGreed() {
   const key = 'fear-greed';
   const cached = fearGreedCache.get(key);
   if (cached) {
-    return { ...cached, meta: { provider: PROVIDER, cached: true, ttl_seconds: FEAR_GREED_TTL_SECONDS } as CacheMeta };
+    return { ...cached, meta: { provider: PROVIDER, cached: true, ttl_seconds: FEAR_GREED_TTL_SECONDS, degraded: false, fetched_at: new Date().toISOString() } as CacheMeta };
   }
 
   try {
@@ -140,9 +77,48 @@ export async function fetchFearGreed() {
       updated_at: payload.updated_at ?? new Date().toISOString()
     };
     fearGreedCache.set(key, normalized, FEAR_GREED_TTL_SECONDS * 1000);
-    return { ...normalized, meta: { provider: PROVIDER, cached: false, ttl_seconds: FEAR_GREED_TTL_SECONDS } as CacheMeta };
+    return { ...normalized, meta: { provider: PROVIDER, cached: false, ttl_seconds: FEAR_GREED_TTL_SECONDS, degraded: false, fetched_at: new Date().toISOString() } as CacheMeta };
   } catch (error) {
-    throw error;
+    try {
+      const fallback = await fetchJson<{ data?: Array<{ value?: string; value_classification?: string; timestamp?: string }> }>('https://api.alternative.me/fng/?limit=1');
+      const entry = fallback.data?.[0];
+      const labels = translateFearGreed(entry?.value_classification ?? 'neutral');
+      const normalized = {
+        value: Number(entry?.value ?? 50),
+        label_pt: labels.label_pt,
+        label_en: labels.label_en,
+        updated_at: entry?.timestamp ? new Date(Number(entry.timestamp) * 1000).toISOString() : new Date().toISOString()
+      };
+      fearGreedCache.set(key, normalized, FEAR_GREED_TTL_SECONDS * 1000);
+      return {
+        ...normalized,
+        meta: {
+          provider: 'alternative.me',
+          cached: false,
+          ttl_seconds: FEAR_GREED_TTL_SECONDS,
+          degraded: false,
+          fetched_at: new Date().toISOString()
+        } as CacheMeta
+      };
+    } catch {
+      const proxy = {
+        value: 50,
+        label_pt: 'Neutro' as const,
+        label_en: 'Neutral' as const,
+        updated_at: new Date().toISOString()
+      };
+      fearGreedCache.set(key, proxy, FEAR_GREED_TTL_SECONDS * 1000);
+      return {
+        ...proxy,
+        meta: {
+          provider: 'proxy',
+          cached: false,
+          ttl_seconds: FEAR_GREED_TTL_SECONDS,
+          degraded: true,
+          fetched_at: new Date().toISOString(),
+          note: 'estimativa'
+        } as CacheMeta
+      };
+    }
   }
 }
-

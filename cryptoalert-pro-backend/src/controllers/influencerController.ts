@@ -29,6 +29,12 @@ export async function getInfluencerMetrics(req: Request, res: Response) {
   return res.json({
     followers_count: followers ?? 0,
     alerts_count_30d: alerts ?? 0,
-    posts_count_30d: posts ?? 0
+    posts_count_30d: posts ?? 0,
+    performance_methodology: {
+      methodology: 'Estimativa baseada em alertas fechados (alvo vs stop vs expiração). Sem promessa de retorno.',
+      sample_size: alerts ?? 0,
+      period: '30d',
+      disclaimer: 'Histórico estimado. Resultados passados não garantem retornos futuros.'
+    }
   });
 }

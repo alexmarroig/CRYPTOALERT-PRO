@@ -9,6 +9,7 @@ import { createRouteMetricMiddleware } from './observability/metrics.js';
 import { createTraceMiddleware } from './observability/telemetry.js';
 import { buildRequestLogContext, logStructuredError } from './utils/logger.js';
 import { requestContext } from './middleware/requestContext.js';
+import { responseWrapper } from './middleware/responseWrapper.js';
 import { classifyFailureType } from './services/incidentService.js';
 
 export function createApp() {
@@ -16,6 +17,7 @@ export function createApp() {
   const jsonParser = express.json();
 
   app.use(requestContext);
+  app.use(responseWrapper);
 
   app.use(cors({
     origin: process.env.FRONTEND_URL ?? 'https://cryptoalert.pro',
@@ -52,7 +54,7 @@ export function createApp() {
       failure_type: classifyFailureType(err.message, req.originalUrl, status)
     });
 
-    res.status(500).json({ error: 'Internal server error', trace_id: req.traceId ?? null });
+    res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
   });
 
   return app;

@@ -98,7 +98,7 @@ test('GET /v1/me complies with documented 200 contract', async () => {
   const response = await request(app).get('/v1/me').set('Authorization', 'Bearer user-token');
 
   assert.equal(response.status, 200);
-  assert.equal(response.body.profile.email, 'user@example.com');
+  assert.equal(response.body.data.profile.email, 'user@example.com');
 });
 
 test('GET /v1/news enforces OpenAPI language enum contract', async () => {
@@ -106,7 +106,7 @@ test('GET /v1/news enforces OpenAPI language enum contract', async () => {
 
   const okResponse = await request(app).get('/v1/news?lang=pt&limit=1');
   assert.equal(okResponse.status, 200);
-  assert.ok(Array.isArray(okResponse.body.items));
+  assert.ok(Array.isArray(okResponse.body.data.items));
 
   const invalidResponse = await request(app).get('/v1/news?lang=es');
   assert.equal(invalidResponse.status, 400);
