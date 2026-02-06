@@ -104,7 +104,8 @@ export async function getPortfolioPerformance(req: Request, res: Response) {
     });
   }
 
-  return res.json({ series, currency: process.env.PORTFOLIO_CURRENCY ?? 'USD', as_of: new Date().toISOString() });
+  const currency = process.env.PORTFOLIO_CURRENCY ?? 'USD';
+  return res.json({ series, currency, currency_code: currency, as_of: new Date().toISOString() });
 }
 
 export async function getPortfolioComposition(req: Request, res: Response) {
@@ -118,7 +119,8 @@ export async function getPortfolioComposition(req: Request, res: Response) {
     value: asset.value ?? null
   })).sort((a, b) => b.percent - a.percent);
 
-  return res.json({ items: assets, as_of: data?.updated_at ?? new Date().toISOString(), currency: process.env.PORTFOLIO_CURRENCY ?? 'USD' });
+  const currency = process.env.PORTFOLIO_CURRENCY ?? 'USD';
+  return res.json({ items: assets, as_of: data?.updated_at ?? new Date().toISOString(), currency, currency_code: currency });
 }
 
 export async function getPortfolioGoalsAlerts(req: Request, res: Response) {
@@ -189,10 +191,12 @@ export async function getPublicPortfolio(req: Request, res: Response, next: Next
     const snapshot = await getPublicPortfolioSnapshotByUserId(profile.id);
     if (mode === 'percent') {
       const percent = buildPercentVisibilitySnapshot(snapshot ?? {});
-      return res.json({ username: profile.username, visibility: mode, change_pct_30d: percent.change_pct_30d, top_assets_percent: percent.top_assets_percent, currency: process.env.PORTFOLIO_CURRENCY ?? 'USD', as_of: percent.as_of });
+      const currency = process.env.PORTFOLIO_CURRENCY ?? 'USD';
+      return res.json({ username: profile.username, visibility: mode, change_pct_30d: percent.change_pct_30d, top_assets_percent: percent.top_assets_percent, currency, currency_code: currency, as_of: percent.as_of });
     }
 
-    return res.json({ username: profile.username, visibility: mode, snapshot, currency: process.env.PORTFOLIO_CURRENCY ?? 'USD', as_of: snapshot?.updated_at ?? new Date().toISOString() });
+    const currency = process.env.PORTFOLIO_CURRENCY ?? 'USD';
+    return res.json({ username: profile.username, visibility: mode, snapshot, currency, currency_code: currency, as_of: snapshot?.updated_at ?? new Date().toISOString() });
   } catch (error) {
     return next(error);
   }

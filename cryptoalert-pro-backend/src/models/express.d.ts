@@ -3,6 +3,7 @@ declare global {
     interface Request {
       authToken?: string;
       traceId?: string;
+      requestId?: string;
       user?: {
         id: string;
         email: string;

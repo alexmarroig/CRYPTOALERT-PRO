@@ -128,6 +128,12 @@ export async function getExpertProfile(req: Request, res: Response) {
     profile,
     recent_alerts: alertsResponse.data ?? [],
     recent_posts: postsResponse.data ?? [],
-    public_portfolio_summary: publicPortfolioSummary
+    public_portfolio_summary: publicPortfolioSummary,
+    performance_summary: {
+      methodology: 'Estimativa baseada em alertas fechados (alvo vs stop vs expiração).',
+      sample_size: (alertsResponse.data ?? []).length,
+      period: '30d',
+      disclaimer: 'Histórico de desempenho (estimado). Não representa promessa de retorno.'
+    }
   });
 }

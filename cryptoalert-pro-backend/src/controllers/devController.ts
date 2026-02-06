@@ -10,29 +10,42 @@ const DEMO_ASSETS = [
 ];
 
 export async function seedDevData(req: Request, res: Response) {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const expertEmail = process.env.EXPERT_EMAIL;
-  const expertPassword = process.env.EXPERT_PASSWORD;
-  const premiumEmail = process.env.PREMIUM_EMAIL;
-  const premiumPassword = process.env.PREMIUM_PASSWORD;
-  const premiumPlan = process.env.PREMIUM_PLAN ?? 'pro';
+  const defaultPassword = process.env.DEMO_PASSWORD ?? `Dev#${randomUUID().slice(0, 8)}`;
 
-  if (!adminEmail || !adminPassword || !expertEmail || !expertPassword || !premiumEmail || !premiumPassword) {
-    return res.status(400).json({ error: 'Missing seed credentials' });
+  const demoUsers = [
+    { email: process.env.ADMIN_DEMO_EMAIL ?? 'admin_demo@cryptoalert.test', role: 'admin', plan: 'vip', usernamePrefix: 'admin', password: process.env.ADMIN_DEMO_PASSWORD ?? defaultPassword },
+    { email: process.env.EXPERT_DEMO_EMAIL ?? 'expert_demo@cryptoalert.test', role: 'influencer', plan: 'pro', usernamePrefix: 'expert', password: process.env.EXPERT_DEMO_PASSWORD ?? defaultPassword },
+    { email: process.env.FREE_DEMO_EMAIL ?? 'free_demo@cryptoalert.test', role: 'user', plan: 'free', usernamePrefix: 'free', password: process.env.FREE_DEMO_PASSWORD ?? defaultPassword },
+    { email: process.env.PRO_DEMO_EMAIL ?? 'pro_demo@cryptoalert.test', role: 'user', plan: 'pro', usernamePrefix: 'pro', password: process.env.PRO_DEMO_PASSWORD ?? defaultPassword },
+    { email: process.env.VIP_DEMO_EMAIL ?? 'vip_demo@cryptoalert.test', role: 'user', plan: 'vip', usernamePrefix: 'vip', password: process.env.VIP_DEMO_PASSWORD ?? defaultPassword }
+  ] as const;
+
+  const createdUsers = [];
+  for (const user of demoUsers) {
+    createdUsers.push(await ensureUser(user.email, user.password, user.role, user.usernamePrefix, user.plan));
   }
 
-  const admin = await ensureUser(adminEmail, adminPassword, 'admin', 'admin');
-  const expert = await ensureUser(expertEmail, expertPassword, 'influencer', 'expert');
-  const premium = await ensureUser(premiumEmail, premiumPassword, 'user', 'premium', premiumPlan);
+  const admin = createdUsers[0];
+  const expert = createdUsers[1];
+  const freeUser = createdUsers[2];
+  const proUser = createdUsers[3];
+  const vipUser = createdUsers[4];
 
   const [alerts, posts] = await Promise.all([
     ensureAlerts(expert.id),
     ensurePosts(expert.id)
   ]);
 
-  await ensureFollow(premium.id, expert.id, 'influencer');
-  await ensurePortfolioSnapshots(expert.id, premium.id);
+  await Promise.all([
+    ensureFollow(freeUser.id, expert.id, 'influencer'),
+    ensureFollow(proUser.id, expert.id, 'influencer'),
+    ensureFollow(vipUser.id, expert.id, 'influencer')
+  ]);
+
+  await ensurePortfolioSnapshots(expert.id, vipUser.id);
+  await ensureNewsCache();
+
+  const magicLinks = await Promise.all(createdUsers.map((user) => generateMagicLink(user.email)));
 
   logger.info('audit.dev.seed', {
     endpoint: req.originalUrl,
@@ -40,10 +53,18 @@ export async function seedDevData(req: Request, res: Response) {
     actor_user_id: req.user?.id ?? null,
     seeded_admin_id: admin.id,
     seeded_expert_id: expert.id,
-    seeded_premium_id: premium.id
+    seeded_users: createdUsers.map((user) => user.id)
   });
 
-  return res.json({ admin, expert, premium, alerts, posts });
+  return res.json({
+    users: createdUsers.map((user, index) => ({
+      ...user,
+      magic_link: magicLinks[index]
+    })),
+    alerts,
+    posts,
+    notes: 'Credenciais e magic links disponíveis apenas em ambiente de desenvolvimento.'
+  });
 }
 
 async function ensureUser(email: string, password: string, role: 'admin' | 'influencer' | 'user', usernamePrefix: string, plan = 'free') {
@@ -130,4 +151,44 @@ async function ensurePortfolioSnapshots(expertId: string, premiumId: string) {
 
   await supabaseAdmin.from('portfolios_snapshot').upsert({ user_id: premiumId, total_value: 12000, change_pct_30d: -1.2, assets: DEMO_ASSETS, updated_at: now }, { onConflict: 'user_id' });
   await supabaseAdmin.from('portfolio_visibility').upsert({ user_id: premiumId, visibility: 'private' });
+}
+
+async function generateMagicLink(email: string) {
+  try {
+    const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+      type: 'magiclink',
+      email
+    });
+    if (error) {
+      return null;
+    }
+    return data?.properties?.action_link ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function ensureNewsCache() {
+  try {
+    await supabaseAdmin.from('news_cache').upsert({
+      key: 'seed',
+      payload: {
+        items: [
+          {
+            id: 'seed-1',
+            title: 'Mercado cripto abre a semana em equilíbrio',
+            source: 'CryptoAlert Seed',
+            url: 'https://cryptoalert.pro/news/seed-1',
+            published_at: new Date().toISOString(),
+            assets: ['BTC', 'ETH'],
+            summary: 'Conteúdo fictício para testes de UI.'
+          }
+        ],
+        meta: { provider: 'seed', cached: true, ttl_seconds: 3600, degraded: false, fetched_at: new Date().toISOString() }
+      },
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'key' });
+  } catch (error) {
+    logger.warn('dev.seed.news_cache_failed', { error: error instanceof Error ? error.message : 'unknown' });
+  }
 }

@@ -9,13 +9,15 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     }
 
     return res.status(err.statusCode).json({
-      error: err.message,
-      code: err.code,
-      details: err.details
+      error: {
+        code: err.code ?? 'APP_ERROR',
+        message: err.message,
+        details: err.details
+      }
     });
   }
 
   const message = err instanceof Error ? err.message : 'Unknown error';
   logger.error('Unhandled error', { message });
-  return res.status(500).json({ error: 'Internal server error' });
+  return res.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } });
 }

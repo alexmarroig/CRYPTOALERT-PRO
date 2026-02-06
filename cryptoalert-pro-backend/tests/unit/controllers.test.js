@@ -29,7 +29,7 @@ function mockRes() {
 
 beforeEach(async () => {
   const { supabaseAdmin } = await import('../../src/config/supabase.js');
-  supabaseAdmin.from = () => ({ select() { return this; }, eq() { return this; }, order() { return this; }, in() { return this; }, limit() { return this; }, range() { return this; },
+  supabaseAdmin.from = () => ({ select() { return this; }, eq() { return this; }, order() { return this; }, in() { return this; }, limit() { return this; }, range() { return this; }, gte() { return this; },
     insert() { return this; }, update() { return this; }, upsert() { return this; }, delete() { return this; }, single: async () => ({ data: {}, error: null }), maybeSingle: async () => ({ data: {}, error: null }), then(resolve){ resolve({ data: [], error: null, count: 0}); } });
 });
 
@@ -102,5 +102,27 @@ test('alerts/posts/notify/portfolio usam dependências mockadas', async () => {
 
   res = mockRes();
   await syncPortfolio({ user: { id: 'u1' } }, res);
+  assert.equal(res.statusCode, 200);
+});
+
+test('support/expert/admin endpoints básicos respondem', async () => {
+  const { createSupportTicket, listMySupportTickets } = await import('../../src/controllers/supportController.js');
+  const { getExpertDashboard } = await import('../../src/controllers/expertController.js');
+  const { listUsersAdmin } = await import('../../src/controllers/adminOpsController.js');
+
+  let res = mockRes();
+  await createSupportTicket({ user: { id: 'u1' }, body: { type: 'bug', title: 'Falha', message: 'Erro ao abrir' } }, res);
+  assert.equal(res.statusCode, 201);
+
+  res = mockRes();
+  await listMySupportTickets({ user: { id: 'u1' } }, res);
+  assert.equal(res.statusCode, 200);
+
+  res = mockRes();
+  await getExpertDashboard({ user: { id: 'u1' } }, res);
+  assert.equal(res.statusCode, 200);
+
+  res = mockRes();
+  await listUsersAdmin({ query: {} }, res);
   assert.equal(res.statusCode, 200);
 });
