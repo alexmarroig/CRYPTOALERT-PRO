@@ -17,6 +17,7 @@ import { devRoutes } from './devRoutes.js';
 import { incidentRiskRoutes } from './incidentRiskRoutes.js';
 import { opsRoutes } from './opsRoutes.js';
 import { supportRoutes } from './supportRoutes.js';
+import gameRoutes from './gameRoutes.js';
 
 export const v1Routes = Router();
 
@@ -39,3 +40,4 @@ v1Routes.use('/', supportRoutes);
 
 v1Routes.use('/incident-risk', incidentRiskRoutes);
 v1Routes.use('/', opsRoutes);
+v1Routes.use('/game', gameRoutes);
